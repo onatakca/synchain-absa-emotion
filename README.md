@@ -19,8 +19,6 @@ This work is based on the following research:
 > *Rui Fan, Shu Li, Tingting He, Yu Liu*  
 > Proceedings of the 31st International Conference on Computational Linguistics (COLING 2025)
 
-If you utilize the original Syn-Chain logic, please cite:
-
 ```bibtex
 @inproceedings{fan2025aspect,
   author       = {Rui Fan and Shu Li and Tingting He and Yu Liu},
