@@ -51,7 +51,7 @@ CONLL_EXPLANATION = (
     "MISC (other additional information, left blank here)."
 )
 
-EMOTION_LABELS = [
+EMOTION_LABELS_SENWAVE = [
     "optimistic",
     "thankful",
     "empathetic",
@@ -64,17 +64,22 @@ EMOTION_LABELS = [
     "joking",
 ]
 
-EMOTION_LABELS_myb = [
-    "anger",
-    "fear",
-    "joy",
-    "sadness",
-    "trust",
-    "anticipation",
-    "surprise",
-    "disgust",
+EMOTION_LABELS = [
+    "optimistic",
+    "thankful", #"gratitude",
+    "empathetic",
+    "pessimistic",
+    "anxious",
+    "sad",
+    "annoyed",
+    "hopeful",
+    "proud",
+    "trustful",
+    "satisfied",
+    "scared",
+    "angry",
+    "demand_for_action",
 ]
-
 
 def get_emotion_labels_str():
     return ", ".join(EMOTION_LABELS[:-1]) + f", or {EMOTION_LABELS[-1]}"

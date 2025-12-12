@@ -35,7 +35,12 @@ def load_model(
         cache_dir,
         trust_remote_code=True,
         local_files_only=True,
+        fix_mistral_regex=True,
+        padding_side='left',
     )
+    
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
 
     model = Qwen2ForCausalLM.from_pretrained(
         cache_dir,
@@ -78,12 +83,44 @@ def generate_response(
     return response.strip()
 
 
-def generate_batch(model, tokenizer, prompts, max_new_tokens):
-    inputs = tokenizer(prompts, padding=True, return_tensors="pt").to(model.device)
-
-    with tqdm(total=len(prompts), desc="Batch generation", unit="prompt") as pbar:
-        outputs = model.generate(**inputs, max_new_tokens=max_new_tokens)
-        pbar.update(len(prompts))
-
-    decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-    return decoded
+def generate_batch(model, tokenizer, prompts, max_new_tokens, batch_size=2):
+    if prompts and isinstance(prompts[0], list):
+        texts = [
+            tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
+            for messages in prompts
+        ]
+    else:
+        texts = prompts
+    
+    all_decoded = []
+    
+    with tqdm(total=len(texts), desc="Generating", unit="prompt") as pbar:
+        for i in range(0, len(texts), batch_size):
+            batch_texts = texts[i:i+batch_size]
+            inputs = tokenizer(
+                batch_texts, 
+                padding=True, 
+                truncation=True,
+                max_length=2048,
+                return_tensors="pt"
+            ).to(model.device)
+            
+            with torch.no_grad():
+                outputs = model.generate(**inputs, max_new_tokens=max_new_tokens)
+            
+            generated_ids = [
+                output_ids[len(input_ids):]
+                for input_ids, output_ids in zip(inputs.input_ids, outputs)
+            ]
+            
+            decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+            all_decoded.extend(decoded)
+            
+            del inputs, outputs, generated_ids
+            torch.cuda.empty_cache()
+            
+            pbar.update(len(batch_texts))
+    
+    return all_decoded
