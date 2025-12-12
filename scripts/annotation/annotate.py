@@ -11,8 +11,8 @@ from scripts.qwen_model.prompts import (prompt_aspect_extraction,
 from scripts.qwen_model.qwen_model import generate_batch, load_model
 
 N_SAMPLES = 50
-INPUT_FILE = "/home/s3758869/synchain-absa-emotion/data/COVIDSenti/COVIDSenti_full_parsed.csv"
-OUTPUT_FILE = f"/home/s3758869/synchain-absa-emotion/data/COVIDSenti/COVIDSenti_conversational_annotated_{N_SAMPLES}.json"
+INPUT_FILE = "/home/s3758869/synchain-absa-emotion/data/input_data/COVIDSenti/processed/COVIDSenti_full_parsed.csv"
+OUTPUT_FILE = f"/home/s3758869/synchain-absa-emotion/data/output_data/COVIDSenti_conversational_annotated_{N_SAMPLES}.json"
 
 MODEL_NAME = "Qwen/Qwen2.5-72B-Instruct"
 MODEL_DIR = "/home/s3758869/synchain-absa-emotion/models/Qwen2.5-72B-Instruct"
