@@ -22,8 +22,15 @@ def preprocess_dataset(input_file, output_file, tweet_column):
 # note : from covid_sentti remove labels and from COVID-19-NLP all other columns
 # output files for COVID-19-NLP and CovidSneti must be tweet, original_sentiment
 
+# todo : Salih
+# from all non news tweets, remove
+# links
+
 def llm_tweet_annotation(model, tokenizer, input_file, output_file, tweet_column):
-   #TODO: Salih to implement LLM news ann
+   #TODO: Salih to implement LLM news annotation. 
+   # remove also non informational tweets like : #media #corona vrius 
+   # or like #coronasucks .
+   # add column is_news or is_usefu
    pass
 
 def main():

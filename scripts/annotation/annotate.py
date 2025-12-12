@@ -19,7 +19,7 @@ CHECKPOINT_DIR = "/home/s3758869/synchain-absa-emotion/data/output_data/checkpoi
 MODEL_NAME = "Qwen/Qwen2.5-72B-Instruct"
 MODEL_DIR = "/home/s3758869/synchain-absa-emotion/models/Qwen2.5-72B-Instruct"
 QUANTS = 4
-BATCH_SIZE = 2
+BATCH_SIZE = 8
 
 Path(CHECKPOINT_DIR).mkdir(parents=True, exist_ok=True)
 
