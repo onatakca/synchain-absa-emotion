@@ -8,12 +8,12 @@
 
 echo "Job ID: $SLURM_JOB_ID"
 
-cd /home/s3521281/synchain-absa-emotion 
+cd /home/s3758869/synchain-absa-emotion 
 
-export PYTHONPATH="/home/s3521281/synchain-absa-emotion:$PYTHONPATH"
+export PYTHONPATH="/home/s3758869/synchain-absa-emotion:$PYTHONPATH"
 
 echo "GPU Information:"
 nvidia-smi --query-gpu=name,memory.total,memory.free --format=csv
 echo ""
 
-python3 scripts/annotate.py
+python3 scripts/annotation/annotate.py

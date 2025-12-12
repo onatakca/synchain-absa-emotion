@@ -1,5 +1,3 @@
-
-
 SYSTEM_ASPECT_EXTRACTION = (
     "You are an NLP expert specializing in aspect-based sentiment analysis. "
     "Your task is to identify aspect terms (entities, topics, or features) "
@@ -36,8 +34,6 @@ SYSTEM_EMOTION = (
 )
 
 
-
-
 CONLL_EXPLANATION = (
     "Each row in the table represents a word in the sentence, and each column "
     "represents some specific properties of the word, including: "
@@ -65,7 +61,7 @@ EMOTION_LABELS = [
     "annoyed",
     "denial",
     "official report",
-    "joking"
+    "joking",
 ]
 
 EMOTION_LABELS_myb = [
@@ -79,56 +75,60 @@ EMOTION_LABELS_myb = [
     "disgust",
 ]
 
+
 def get_emotion_labels_str():
     return ", ".join(EMOTION_LABELS[:-1]) + f", or {EMOTION_LABELS[-1]}"
 
+
 def prompt_aspect_extraction(sentence: str, structure: str) -> list:
     prompt = (
-        f'Given the sentence \'{sentence}\', '
+        f"Given the sentence '{sentence}', "
         f'and its syntactic structure: "{structure}" '
-        f'Identify all aspect terms in this sentence. Aspect terms are entities, '
-        f'topics, or features that the speaker expresses an opinion about. '
-        f'For COVID-19 related tweets, aspects might include: vaccines, lockdowns, '
-        f'masks, government response, healthcare workers, symptoms, etc. '
-        f'\n\nFormat your response as follows:\n'
-        f'ASPECT: <aspect_term>\n'
-        f'REASON: <explanation>\n\n'
-        f'Repeat this format for each aspect found.'
+        f"Identify all aspect terms in this sentence. Aspect terms are entities, "
+        f"topics, or features that the speaker expresses an opinion about. "
+        f"For COVID-19 related tweets, aspects might include: vaccines, lockdowns, "
+        f"masks, government response, healthcare workers, symptoms, etc. "
+        f"\n\nFormat your response as follows:\n"
+        f"ASPECT: <aspect_term>\n"
+        f"REASON: <explanation>\n\n"
+        f"Repeat this format for each aspect found."
     )
-    
+
     return [
         {"role": "system", "content": SYSTEM_ASPECT_EXTRACTION},
         {"role": "user", "content": prompt},
     ]
-    
+
+
 def prompt_aspect_extraction_labeled(
     sentence: str, structure: str, aspects: list
 ) -> list:
     aspects_str = ", ".join([f"'{a}'" for a in aspects])
-    
+
     prompt = (
-        f'Given the sentence \'{sentence}\', '
+        f"Given the sentence '{sentence}', "
         f'and its syntactic structure: "{structure}" '
-        f'Identify all aspect terms in this sentence. Aspect terms are entities, '
-        f'topics, or features that the speaker expresses an opinion about. '
-        f'The aspect terms in this sentence are: {aspects_str}. '
-        f'Explain why each of these is an aspect term.'
+        f"Identify all aspect terms in this sentence. Aspect terms are entities, "
+        f"topics, or features that the speaker expresses an opinion about. "
+        f"The aspect terms in this sentence are: {aspects_str}. "
+        f"Explain why each of these is an aspect term."
     )
-    
+
     return [
         {"role": "system", "content": SYSTEM_ASPECT_EXTRACTION},
         {"role": "user", "content": prompt},
     ]
-    
+
+
 def prompt_syntactic_parsing(sentence: str, aspect: str, structure: str) -> list:
     prompt = (
-        f'Given the sentence \'{sentence}\', '
+        f"Given the sentence '{sentence}', "
         f'"{structure}" is the CoNLL-U format for the syntactic dependency '
-        f'relationship of this sentence. {CONLL_EXPLANATION} '
-        f'Based on the syntactic dependency information of the sentence, '
-        f'analyze information related to \'{aspect}\' in the sentence.'
+        f"relationship of this sentence. {CONLL_EXPLANATION} "
+        f"Based on the syntactic dependency information of the sentence, "
+        f"analyze information related to '{aspect}' in the sentence."
     )
-    
+
     return [
         {"role": "system", "content": SYSTEM_SYNTACTIC},
         {"role": "user", "content": prompt},
@@ -139,29 +139,28 @@ def prompt_syntactic_parsing_labeled(
     sentence: str, aspect: str, structure: str, polarity: str
 ) -> list:
     prompt = (
-        f'Given the sentence \'{sentence}\', '
+        f"Given the sentence '{sentence}', "
         f'"{structure}" is the CoNLL-U format for the syntactic dependency '
-        f'relationship of this sentence. {CONLL_EXPLANATION} '
-        f'Based on the syntactic dependency information of the sentence, '
-        f'analyze information related to \'{aspect}\' in the sentence. '
-        f'The sentiment polarity towards \'{aspect}\' is {polarity}.'
+        f"relationship of this sentence. {CONLL_EXPLANATION} "
+        f"Based on the syntactic dependency information of the sentence, "
+        f"analyze information related to '{aspect}' in the sentence. "
+        f"The sentiment polarity towards '{aspect}' is {polarity}."
     )
-    
+
     return [
         {"role": "system", "content": SYSTEM_SYNTACTIC},
         {"role": "user", "content": prompt},
     ]
-    
-def prompt_opinion_extraction(
-    sentence: str, aspect: str, syntactic_info: str
-) -> list:
+
+
+def prompt_opinion_extraction(sentence: str, aspect: str, syntactic_info: str) -> list:
     prompt = (
-        f'Given the sentence \'{sentence}\', '
-        f'{syntactic_info} '
-        f'Considering the context and information related to \'{aspect}\', '
-        f'what is the speaker\'s opinion towards \'{aspect}\'?'
+        f"Given the sentence '{sentence}', "
+        f"{syntactic_info} "
+        f"Considering the context and information related to '{aspect}', "
+        f"what is the speaker's opinion towards '{aspect}'?"
     )
-    
+
     return [
         {"role": "system", "content": SYSTEM_OPINION},
         {"role": "user", "content": prompt},
@@ -172,13 +171,13 @@ def prompt_opinion_extraction_labeled(
     sentence: str, aspect: str, syntactic_info: str, polarity: str
 ) -> list:
     prompt = (
-        f'Given the sentence \'{sentence}\', '
-        f'{syntactic_info} '
-        f'Considering the context and information related to \'{aspect}\', '
-        f'what is the speaker\'s opinion towards \'{aspect}\'? '
-        f'The sentiment polarity towards \'{aspect}\' is {polarity}.'
+        f"Given the sentence '{sentence}', "
+        f"{syntactic_info} "
+        f"Considering the context and information related to '{aspect}', "
+        f"what is the speaker's opinion towards '{aspect}'? "
+        f"The sentiment polarity towards '{aspect}' is {polarity}."
     )
-    
+
     return [
         {"role": "system", "content": SYSTEM_OPINION},
         {"role": "user", "content": prompt},
@@ -189,15 +188,15 @@ def prompt_emotion_classification(
     sentence: str, aspect: str, opinion_info: str
 ) -> list:
     emotion_options = get_emotion_labels_str()
-    
+
     prompt = (
-        f'Given the sentence \'{sentence}\', '
-        f'and the opinion analysis: {opinion_info} '
-        f'What emotion is the speaker expressing towards \'{aspect}\'? '
+        f"Given the sentence '{sentence}', "
+        f"and the opinion analysis: {opinion_info} "
+        f"What emotion is the speaker expressing towards '{aspect}'? "
         f"Choose exactly one label from: {emotion_options}. "
         f"First output: Emotion: <label>. Then explain your reasoning."
     )
-    
+
     return [
         {"role": "system", "content": SYSTEM_EMOTION},
         {"role": "user", "content": prompt},
@@ -208,16 +207,16 @@ def prompt_emotion_classification_labeled(
     sentence: str, aspect: str, opinion_info: str, emotion: str
 ) -> list:
     emotion_options = get_emotion_labels_str()
-    
+
     prompt = (
-        f'Given the sentence \'{sentence}\', '
-        f'and the opinion analysis: {opinion_info} '
-        f'What emotion is the speaker expressing towards \'{aspect}\'? '
+        f"Given the sentence '{sentence}', "
+        f"and the opinion analysis: {opinion_info} "
+        f"What emotion is the speaker expressing towards '{aspect}'? "
         f"Choose exactly one emotion from: {emotion_options}. "
         f"The emotion expressed towards '{aspect}' is {emotion}. "
         f"Explain why this emotion is appropriate based on the language used."
     )
-    
+
     return [
         {"role": "system", "content": SYSTEM_EMOTION},
         {"role": "user", "content": prompt},
@@ -228,12 +227,12 @@ def prompt_sentiment_classification(
     sentence: str, aspect: str, opinion_info: str
 ) -> list:
     prompt = (
-        f'Given the sentence \'{sentence}\', '
-        f'{opinion_info} '
-        f'Based on common sense and the speaker\'s opinion, '
-        f'what is the sentiment polarity towards \'{aspect}\'?'
+        f"Given the sentence '{sentence}', "
+        f"{opinion_info} "
+        f"Based on common sense and the speaker's opinion, "
+        f"what is the sentiment polarity towards '{aspect}'?"
     )
-    
+
     return [
         {"role": "system", "content": SYSTEM_SENTIMENT},
         {"role": "user", "content": prompt},
@@ -244,15 +243,14 @@ def prompt_sentiment_classification_labeled(
     sentence: str, aspect: str, opinion_info: str, polarity: str
 ) -> list:
     prompt = (
-        f'Given the sentence \'{sentence}\', '
-        f'{opinion_info} '
-        f'Based on common sense and the speaker\'s opinion, '
-        f'what is the sentiment polarity towards \'{aspect}\'? '
-        f'The sentiment polarity towards \'{aspect}\' is {polarity}.'
+        f"Given the sentence '{sentence}', "
+        f"{opinion_info} "
+        f"Based on common sense and the speaker's opinion, "
+        f"what is the sentiment polarity towards '{aspect}'? "
+        f"The sentiment polarity towards '{aspect}' is {polarity}."
     )
-    
+
     return [
         {"role": "system", "content": SYSTEM_SENTIMENT},
         {"role": "user", "content": prompt},
     ]
-

@@ -1,25 +1,28 @@
 import argparse
+import sys
+
 import pandas as pd
 import spacy
 from tqdm import tqdm
-import sys
 
 
 def token_to_conllu(token, idx):
     head_idx = token.head.i - token.sent[0].i + 1 if token.head.i != token.i else 0
 
-    return "\t".join([
-        str(idx),
-        token.text,
-        token.lemma_,
-        token.pos_,
-        token.tag_,
-        "_",
-        str(head_idx),
-        token.dep_,
-        "_",
-        "_"
-    ])
+    return "\t".join(
+        [
+            str(idx),
+            token.text,
+            token.lemma_,
+            token.pos_,
+            token.tag_,
+            "_",
+            str(head_idx),
+            token.dep_,
+            "_",
+            "_",
+        ]
+    )
 
 
 def parse_to_conllu(text, nlp):
@@ -56,15 +59,15 @@ def preprocess_dataset(input_path, output_path, sample_size=None):
         print(f"Sampling {sample_size} tweets...")
         df = df.sample(n=sample_size, random_state=42).reset_index(drop=True)
 
-    df['conllu_parse'] = ""
+    df["conllu_parse"] = ""
 
     print(f"Parsing {len(df)} tweets...")
     for idx, row in tqdm(df.iterrows(), total=len(df), desc="Parsing tweets"):
-        tweet_text = str(row['tweet'])
+        tweet_text = str(row["tweet"])
         conllu = parse_to_conllu(tweet_text, nlp)
-        df.at[idx, 'conllu_parse'] = conllu
+        df.at[idx, "conllu_parse"] = conllu
 
-    df_parsed = df[df['conllu_parse'] != ""].copy()
+    df_parsed = df[df["conllu_parse"] != ""].copy()
     print(f"\nSuccessfully parsed: {len(df_parsed)}/{len(df)} tweets")
 
     if len(df_parsed) < len(df):
@@ -79,13 +82,24 @@ def preprocess_dataset(input_path, output_path, sample_size=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Preprocess COVIDSenti dataset with syntactic parsing")
-    parser.add_argument("--input", type=str, default="COVIDSenti.csv",
-                        help="Input CSV file path")
-    parser.add_argument("--output", type=str, default="COVIDSenti_parsed.csv",
-                        help="Output CSV file path")
-    parser.add_argument("--sample", type=int, default=None,
-                        help="Number of samples to process (default: all)")
+    parser = argparse.ArgumentParser(
+        description="Preprocess COVIDSenti dataset with syntactic parsing"
+    )
+    parser.add_argument(
+        "--input", type=str, default="COVIDSenti.csv", help="Input CSV file path"
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="COVIDSenti_parsed.csv",
+        help="Output CSV file path",
+    )
+    parser.add_argument(
+        "--sample",
+        type=int,
+        default=None,
+        help="Number of samples to process (default: all)",
+    )
 
     args = parser.parse_args()
 

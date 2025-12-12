@@ -1,17 +1,14 @@
-import pandas as pd
-import re
 import json
 
-from modeling.qwen_model import load_model, generate_batch
-from annotation.prompts import (
-    prompt_syntactic_parsing,
-    prompt_aspect_extraction,
-    prompt_opinion_extraction,
-    prompt_emotion_classification,
-    prompt_sentiment_classification,
-)
+import pandas as pd
 
-from .parsing import is_news_like, extract_aspects
+from scripts.annotation.parsing import extract_aspects, is_news_like
+from scripts.qwen_model.prompts import (prompt_aspect_extraction,
+                                        prompt_emotion_classification,
+                                        prompt_opinion_extraction,
+                                        prompt_sentiment_classification,
+                                        prompt_syntactic_parsing)
+from scripts.qwen_model.qwen_model import generate_batch, load_model
 
 N_SAMPLES = 50
 INPUT_FILE = "data/COVIDSenti/COVIDSenti_full_parsed.csv"
@@ -31,23 +28,17 @@ conllus = df["conllu_parse"].tolist()
 
 
 model, tokenizer = load_model(
-    MODEL_NAME,
-    QUANTS,
-    device_map="auto",
-    cache_dir=MODEL_DIR
+    MODEL_NAME, QUANTS, device_map="auto", cache_dir=MODEL_DIR
 )
 
-prompts_r1 = [
-    prompt_aspect_extraction(t, c)
-    for t, c in zip(tweets, conllus)
-]
+prompts_r1 = [prompt_aspect_extraction(t, c) for t, c in zip(tweets, conllus)]
 
 r1_outputs = generate_batch(model, tokenizer, prompts_r1, max_new_tokens=150)
 
 aspect_lists = [extract_aspects(x) for x in r1_outputs]
 
 
-tasks = []    # each element: {tweet, conllu, aspect, idx}
+tasks = []  # each element: {tweet, conllu, aspect, idx}
 for i, (tweet, conllu, aspects) in enumerate(zip(tweets, conllus, aspect_lists)):
     for a in aspects:
         tasks.append((i, tweet, conllu, a))
@@ -77,7 +68,6 @@ prompts_r4 = [
 r4_outputs = generate_batch(model, tokenizer, prompts_r4, max_new_tokens=120)
 
 
-
 prompts_r5 = [
     prompt_emotion_classification(tweet, aspect, op)
     for (op, (_, tweet, _, aspect)) in zip(r3_outputs, tasks)
@@ -94,9 +84,11 @@ for i, tweet in enumerate(tweets):
     aspect_syntactic = {}
     aspect_opinions = {}
     aspect_emotions = {}
-    
+
     aspect_id = 0
-    for idx, (task, syn, op, sent, emo) in enumerate(zip(tasks, r2_outputs, r3_outputs, r4_outputs, r5_outputs)):
+    for idx, (task, syn, op, sent, emo) in enumerate(
+        zip(tasks, r2_outputs, r3_outputs, r4_outputs, r5_outputs)
+    ):
         tweet_idx, _, _, aspect = task
         if tweet_idx == i:
             aspects_dict[aspect] = aspect_id
@@ -105,16 +97,16 @@ for i, tweet in enumerate(tweets):
             aspect_opinions[aspect_id] = op
             aspect_emotions[aspect_id] = emo
             aspect_id += 1
-    
+
     output_data[tweet] = {
         "aspects": aspects_dict,
         "aspect_sentiments": aspect_sentiments,
         "aspect_syntactic": aspect_syntactic,
         "aspect_opinions": aspect_opinions,
-        "aspect_emotions": aspect_emotions
+        "aspect_emotions": aspect_emotions,
     }
 
-with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
+with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
     json.dump(output_data, f, indent=2, ensure_ascii=False)
 
 print("Saved:", OUTPUT_FILE)
