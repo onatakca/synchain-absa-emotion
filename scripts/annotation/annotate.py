@@ -9,7 +9,8 @@ from scripts.qwen_model.prompts import (prompt_aspect_extraction,
                                         prompt_opinion_extraction,
                                         prompt_sentiment_classification,
                                         prompt_syntactic_parsing)
-from scripts.qwen_model.qwen_model import generate_batch, load_model
+
+from scripts.qwen_model.qwen_model import generate_batch, load_model, generate_batch_with_checkpoint
 
 N_SAMPLES = 50
 INPUT_FILE = "/home/s3758869/synchain-absa-emotion/data/input_data/COVIDSenti/processed/COVIDSenti_full_parsed.csv"
@@ -43,8 +44,15 @@ model, tokenizer = load_model(
 
 prompts_r1 = [prompt_aspect_extraction(t, c) for t, c in zip(tweets, conllus)]
 
-r1_outputs = generate_batch(model, tokenizer, prompts_r1, max_new_tokens=150, batch_size=BATCH_SIZE)
-save_checkpoint(r1_outputs, "R1: Aspect extraction", f"r1_aspects_{N_SAMPLES}.json")
+r1_ckpt = f"{CHECKPOINT_DIR}/r1_aspects_{N_SAMPLES}.json"
+r1_outputs = generate_batch_with_checkpoint(
+    model,
+    tokenizer,
+    prompts_r1,
+    max_new_tokens=150,
+    batch_size=BATCH_SIZE,
+    checkpoint_file=r1_ckpt,
+)
 
 aspect_lists = [extract_aspects(x) for x in r1_outputs]
 
@@ -61,8 +69,15 @@ prompts_r2 = [
     for (_, tweet, conllu, aspect) in tasks
 ]
 
-r2_outputs = generate_batch(model, tokenizer, prompts_r2, max_new_tokens=200, batch_size=BATCH_SIZE)
-save_checkpoint(r2_outputs, "R2: Syntactic parsing", f"r2_syntactic_{N_SAMPLES}.json")
+r2_ckpt = f"{CHECKPOINT_DIR}/r2_syntactic_{N_SAMPLES}.json"
+r2_outputs = generate_batch_with_checkpoint(
+    model,
+    tokenizer,
+    prompts_r2,
+    max_new_tokens=200,
+    batch_size=BATCH_SIZE,
+    checkpoint_file=r2_ckpt,
+)
 
 
 prompts_r3 = [
@@ -70,16 +85,30 @@ prompts_r3 = [
     for (syn, (_, tweet, _, aspect)) in zip(r2_outputs, tasks)
 ]
 
-r3_outputs = generate_batch(model, tokenizer, prompts_r3, max_new_tokens=120, batch_size=BATCH_SIZE)
-save_checkpoint(r3_outputs, "R3: Opinion extraction", f"r3_opinions_{N_SAMPLES}.json")
+r3_ckpt = f"{CHECKPOINT_DIR}/r3_opinions_{N_SAMPLES}.json"
+r3_outputs = generate_batch_with_checkpoint(
+    model,
+    tokenizer,
+    prompts_r3,
+    max_new_tokens=120,
+    batch_size=BATCH_SIZE,
+    checkpoint_file=r3_ckpt,
+)
 
 prompts_r4 = [
     prompt_sentiment_classification(tweet, aspect, op)
     for (op, (_, tweet, _, aspect)) in zip(r3_outputs, tasks)
 ]
 
-r4_outputs = generate_batch(model, tokenizer, prompts_r4, max_new_tokens=120, batch_size=BATCH_SIZE)
-save_checkpoint(r4_outputs, "R4: Sentiment classification", f"r4_sentiments_{N_SAMPLES}.json")
+r4_ckpt = f"{CHECKPOINT_DIR}/r4_sentiments_{N_SAMPLES}.json"
+r4_outputs = generate_batch_with_checkpoint(
+    model,
+    tokenizer,
+    prompts_r4,
+    max_new_tokens=120,
+    batch_size=BATCH_SIZE,
+    checkpoint_file=r4_ckpt,
+)
 
 
 prompts_r5 = [
@@ -87,8 +116,15 @@ prompts_r5 = [
     for (op, (_, tweet, _, aspect)) in zip(r3_outputs, tasks)
 ]
 
-r5_outputs = generate_batch(model, tokenizer, prompts_r5, max_new_tokens=120, batch_size=BATCH_SIZE)
-save_checkpoint(r5_outputs, "R5: Emotion classification", f"r5_emotions_{N_SAMPLES}.json")
+r5_ckpt = f"{CHECKPOINT_DIR}/r5_emotions_{N_SAMPLES}.json"
+r5_outputs = generate_batch_with_checkpoint(
+    model,
+    tokenizer,
+    prompts_r5,
+    max_new_tokens=120,
+    batch_size=BATCH_SIZE,
+    checkpoint_file=r5_ckpt,
+)
 
 
 output_data = {}

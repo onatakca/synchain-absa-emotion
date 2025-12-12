@@ -4,6 +4,8 @@ import torch
 from tqdm import tqdm
 from transformers import AutoTokenizer, BitsAndBytesConfig
 from transformers.models.qwen2.modeling_qwen2 import Qwen2ForCausalLM
+from pathlib import Path
+import json
 
 LOCAL_MODEL_CACHE_DIR = (
     "/home/s3758869/synchain-absa-emotion/models/Qwen2.5-72B-Instruct"
@@ -96,7 +98,7 @@ def generate_batch(model, tokenizer, prompts, max_new_tokens, batch_size=2):
     
     all_decoded = []
     
-    with tqdm(total=len(texts), desc="Generating", unit="prompt") as pbar:
+    with tqdm(total=len(texts), desc="Generating", unit="batch") as pbar:
         for i in range(0, len(texts), batch_size):
             batch_texts = texts[i:i+batch_size]
             inputs = tokenizer(
@@ -123,4 +125,84 @@ def generate_batch(model, tokenizer, prompts, max_new_tokens, batch_size=2):
             
             pbar.update(len(batch_texts))
     
+    return all_decoded
+
+
+def generate_batch_with_checkpoint(
+    model,
+    tokenizer,
+    prompts,
+    max_new_tokens,
+    batch_size,
+    checkpoint_file,
+):
+    checkpoint_path = Path(checkpoint_file)
+
+    if prompts and isinstance(prompts[0], list) and isinstance(prompts[0][0], dict):
+        texts = [
+            tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+            for messages in prompts
+        ]
+    else:
+        texts = prompts
+
+    total = len(texts)
+
+    if checkpoint_path.exists():
+        with open(checkpoint_path, "r", encoding="utf-8") as f:
+            saved_outputs = json.load(f)
+        if len(saved_outputs) > total:
+            raise ValueError(f"Checkpoint has more outputs ({len(saved_outputs)}) than prompts ({total}).")
+        start_idx = len(saved_outputs)
+        all_decoded = saved_outputs
+        print(f"[{checkpoint_path.name}] Resuming from {start_idx}/{total}")
+    else:
+        all_decoded = []
+        start_idx = 0
+        print(f"[{checkpoint_path.name}] No checkpoint found, starting fresh.")
+
+    if start_idx >= total:
+        print(f"[{checkpoint_path.name}] All {total} prompts already processed.")
+        return all_decoded
+
+    with tqdm(total=total - start_idx,desc=f"Generating ({checkpoint_path.name})",unit=f"batch") as pbar:
+        for i in range(start_idx, total, batch_size):
+            batch_texts = texts[i : i + batch_size]
+
+            inputs = tokenizer(
+                batch_texts,
+                padding=True,
+                truncation=True,
+                max_length=2048,
+                return_tensors="pt",
+            ).to(model.device)
+
+            with torch.no_grad():
+                outputs = model.generate(
+                    **inputs,
+                    max_new_tokens=max_new_tokens,
+                )
+
+            input_len = inputs.input_ids.shape[1]
+            generated_ids = outputs[:, input_len:]
+
+            decoded = tokenizer.batch_decode(
+                generated_ids,
+                skip_special_tokens=True,
+            )
+
+            all_decoded.extend(decoded)
+
+            with open(checkpoint_path, "w", encoding="utf-8") as f:
+                json.dump(all_decoded, f, indent=2, ensure_ascii=False)
+
+            del inputs, outputs, generated_ids
+            torch.cuda.empty_cache()
+
+            pbar.update(len(batch_texts))
+
     return all_decoded
