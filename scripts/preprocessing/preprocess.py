@@ -17,6 +17,11 @@ def preprocess_dataset(input_file, output_file, tweet_column):
    Path(output_file).parent.mkdir(parents=True, exist_ok=True)
    df.to_csv(output_file, index=False)
 
+# TODO : Salih
+# note : from SenWave remove all that are in category Denial,Official report,Joking
+# note : from covid_sentti remove labels and from COVID-19-NLP all other columns
+# output files for COVID-19-NLP and CovidSneti must be tweet, original_sentiment
+
 def llm_tweet_annotation(model, tokenizer, input_file, output_file, tweet_column):
    #TODO: Salih to implement LLM news ann
    pass
