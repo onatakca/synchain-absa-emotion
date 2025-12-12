@@ -83,22 +83,3 @@ jupyter notebook 03_Teacher_Annotation.ipynb
 - **News-like tweets**: 51,723 (57.5%) - headlines, links, factual statements
 
 This project focuses on **conversational tweets** for meaningful ABSA and emotion analysis.
-
-## Reference & Citation
-
-This work is based on the following research:
-
-> **Aspect-Based Sentiment Analysis with Syntax-Opinion-Sentiment Reasoning Chain**
-> *Rui Fan, Shu Li, Tingting He, Yu Liu*
-> Proceedings of the 31st International Conference on Computational Linguistics (COLING 2025)
-
-```bibtex
-@inproceedings{fan2025aspect,
-  author       = {Rui Fan and Shu Li and Tingting He and Yu Liu},
-  title        = {Aspect-Based Sentiment Analysis with Syntax-Opinion-Sentiment Reasoning Chain},
-  booktitle    = {Proceedings of the 31st International Conference on Computational Linguistics, {COLING} 2025},
-  pages        = {3123--3137},
-  year         = {2025},
-  url          = {https://aclanthology.org/2025.coling-main.210/},
-}
-```

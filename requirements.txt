@@ -1,14 +1,11 @@
-# Core Dependencies
 spacy>=3.8.0
 pandas>=2.3.0
 tqdm>=4.67.0
-
-# spaCy language model
-# Install with: python -m spacy download en_core_web_sm
-
-# Future dependencies (to be added):
-# transformers>=4.30.0  # For LLaMA and Qwen models
-# torch>=2.0.0          # PyTorch for model training
-# peft>=0.4.0           # For LoRA fine-tuning
-# datasets>=2.12.0      # For dataset handling
-# accelerate>=0.20.0    # For distributed training
+torch>=2.1.0
+transformers>=4.45.0
+accelerate>=0.27.0
+bitsandbytes>=0.43.0
+sentencepiece
+protobuf
+safetensors
+Pillow>=10.0.0
