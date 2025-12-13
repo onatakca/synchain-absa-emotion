@@ -13,7 +13,7 @@ from scripts.qwen_model.prompts import (prompt_aspect_extraction,
 from scripts.qwen_model.qwen_model import generate_batch, load_model, generate_batch_with_checkpoint
 
 N_SAMPLES = 50
-INPUT_FILE = "/home/s3758869/synchain-absa-emotion/data/input_data/COVIDSenti/processed/COVIDSenti_full_parsed.csv"
+INPUT_FILE = "/home/s3758869/synchain-absa-emotion/data/input_data/COVIDSenti/final/COVIDSenti_full_parsed.csv"
 OUTPUT_FILE = f"/home/s3758869/synchain-absa-emotion/data/output_data/COVIDSenti_conversational_annotated_{N_SAMPLES}.json"
 CHECKPOINT_DIR = "/home/s3758869/synchain-absa-emotion/data/output_data/checkpoints"
 
