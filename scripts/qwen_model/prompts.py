@@ -51,22 +51,9 @@ CONLL_EXPLANATION = (
     "MISC (other additional information, left blank here)."
 )
 
-EMOTION_LABELS_SENWAVE = [
-    "optimistic",
-    "thankful",
-    "empathetic",
-    "pessimistic",
-    "anxious",
-    "sad",
-    "annoyed",
-    "denial",
-    "official report",
-    "joking",
-]
-
 EMOTION_LABELS = [
     "optimistic",
-    "thankful", #"gratitude",
+    "thankful", 
     "empathetic",
     "pessimistic",
     "anxious",
@@ -78,7 +65,7 @@ EMOTION_LABELS = [
     "satisfied",
     "scared",
     "angry",
-    "demand_for_action",
+    "no_emotion",
 ]
 
 def get_emotion_labels_str():
@@ -90,13 +77,13 @@ def prompt_aspect_extraction(sentence: str, structure: str) -> list:
         f"Given the sentence '{sentence}', "
         f'and its syntactic structure: "{structure}" '
         f"Identify all aspect terms in this sentence. Aspect terms are entities, "
-        f"topics, or features that the speaker expresses an opinion about. "
+        f"topics, or features that the speaker expresses an opinion about. Ensure that aspect is the very name of entity, topic of feature present in the text."
         f"For COVID-19 related tweets, aspects might include: vaccines, lockdowns, "
         f"masks, government response, healthcare workers, symptoms, etc. "
         f"\n\nFormat your response as follows:\n"
         f"ASPECT: <aspect_term>\n"
         f"REASON: <explanation>\n\n"
-        f"Repeat this format for each aspect found."
+        f"Repeat this format for each aspect found. Each aspect must be word person expresses opinion towards in COVID times."
     )
 
     return [
@@ -116,7 +103,7 @@ def prompt_aspect_extraction_labeled(
         f"Identify all aspect terms in this sentence. Aspect terms are entities, "
         f"topics, or features that the speaker expresses an opinion about. "
         f"The aspect terms in this sentence are: {aspects_str}. "
-        f"Explain why each of these is an aspect term."
+        f"Explain why each of these is an aspect term.  Each aspect must be word person expresses opinion towards in COVID times."
     )
 
     return [
@@ -199,7 +186,7 @@ def prompt_emotion_classification(
         f"and the opinion analysis: {opinion_info} "
         f"What emotion is the speaker expressing towards '{aspect}'? "
         f"Choose exactly one label from: {emotion_options}. "
-        f"First output: Emotion: <label>. Then explain your reasoning."
+        f"First output: Emotion: <label>\n. Then explain your reasoning. You must follow this format."
     )
 
     return [
@@ -220,6 +207,7 @@ def prompt_emotion_classification_labeled(
         f"Choose exactly one emotion from: {emotion_options}. "
         f"The emotion expressed towards '{aspect}' is {emotion}. "
         f"Explain why this emotion is appropriate based on the language used."
+        f"First output: Emotion: <label>\n. Then explain your reasoning. You must follow this format."
     )
 
     return [
@@ -236,6 +224,7 @@ def prompt_sentiment_classification(
         f"{opinion_info} "
         f"Based on common sense and the speaker's opinion, "
         f"what is the sentiment polarity towards '{aspect}'?"
+        f"First output: Sentiment: <label>\n. Then explain your reasoning. You must follow this format."
     )
 
     return [
@@ -253,6 +242,7 @@ def prompt_sentiment_classification_labeled(
         f"Based on common sense and the speaker's opinion, "
         f"what is the sentiment polarity towards '{aspect}'? "
         f"The sentiment polarity towards '{aspect}' is {polarity}."
+        f"First output: Sentiment: <label>\n. Then explain your reasoning. You must follow this format."
     )
 
     return [

@@ -7,11 +7,7 @@ import emoji
 from pathlib import Path
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
-try:
-   from tqdm.auto import tqdm
-   _HAS_TQDM = True
-except Exception:
-   _HAS_TQDM = False
+from tqdm import tqdm
 
 PROJECT_ROOT = Path("/home/s2457997/synchain-absa-emotion")
 INPUT_DATA_DIR = PROJECT_ROOT / "data" / "input_data"
@@ -27,10 +23,6 @@ def strip_urls(text: str) -> str:
    if not isinstance(text, str):
       return text
    return re.sub(r"https?://\S+|www\.\S+", "", text)
-
-# Removed old generic preprocessing helper; per-dataset transforms are implemented in main().
-
-# news categorization with Qwen 7B
 
 def _get_5_shot_examples() -> str:
    return (
@@ -49,6 +41,12 @@ def _get_5_shot_examples() -> str:
       Tweet: "President Trump and the first lady have tested positive for Covid-19. The announcement comes after a top aide, Hope Hicks, tested positive for the virus. Here's what we know. https://t.co/oW23SjI95f"
       Classification: news
 
+      Tweet: "Panic food buying in Germany due to #coronavirus has begun.  But the #organic is left behind! #Hamsterkauf"
+      Classification: not news
+      
+      Tweet: "#Covid_19 Went to the Grocery Store, turns out all cleaning supplies have been bought out for fear of Coronavirus."
+      Classification: not news
+      
       Tweet: "BREAKING: President Trump and first lady Melania Trump test positive for Covid-19 https://t.co/w5nU8p2d5X"
       Classification: news
       """
@@ -256,12 +254,8 @@ def llm_tweet_annotation(model, tokenizer, input_file, output_file, tweet_column
    Path(output_file).parent.mkdir(parents=True, exist_ok=True)
    print(f"Classifying tweets with incremental saving (mode={mode_description})...")
 
-   iterator = enumerate(tweets)
-   if _HAS_TQDM:
-      iterator = enumerate(tqdm(tweets, desc="News classification"))
-
    try:
-      for index, tweet_text in iterator:
+      for index, tweet_text in enumerate(tqdm(tweets, desc="News classification")):
          already_labeled = "news_category" in dataframe.columns and isinstance(dataframe.at[index, "news_category"], str)
          if already_labeled:
             continue

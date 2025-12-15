@@ -70,24 +70,24 @@ def preprocess_dataset(input_path, output_path, tweet_column, sample_size=None):
 def main():
     datasets = [
         {
-            "input": "/home/s3758869/synchain-absa-emotion/data/input_data/SenWave/processed/SenWave_proc.csv",
-            "output": "/home/s3758869/synchain-absa-emotion/data/input_data/SenWave/final/SenWave_parsed.csv",
-            "tweet_column": "Tweet",
-        },
-        {
-            "input": "/home/s3758869/synchain-absa-emotion/data/input_data/COVIDSenti/processed/COVIDSenti_full_proc.csv",
-            "output": "/home/s3758869/synchain-absa-emotion/data/input_data/COVIDSenti/final/COVIDSenti_full_parsed.csv",
+            "input": "/home/s3758869/synchain-absa-emotion/data/input_data/COVID-19-NLP/processed/corona_nlp_test_not_news_proc.csv",
+            "output": "/home/s3758869/synchain-absa-emotion/data/input_data/COVID-19-NLP/final/corona_nlp_test_not_news_proc.csv",
             "tweet_column": "tweet",
         },
         {
-            "input": "/home/s3758869/synchain-absa-emotion/data/input_data/COVID-19-NLP/processed/Corona_NLP_test_proc.csv",
-            "output": "/home/s3758869/synchain-absa-emotion/data/input_data/COVID-19-NLP/final/Corona_NLP_test_parsed.csv",
-            "tweet_column": "OriginalTweet",
+            "input": "/home/s3758869/synchain-absa-emotion/data/input_data/COVID-19-NLP/processed/corona_nlp_train_not_news_proc.csv",
+            "output": "/home/s3758869/synchain-absa-emotion/data/input_data/COVID-19-NLP/final/corona_nlp_train_not_news_proc.csv",
+            "tweet_column": "tweet",
         },
         {
-            "input": "/home/s3758869/synchain-absa-emotion/data/input_data/COVID-19-NLP/processed/Corona_NLP_train_proc.csv",
-            "output": "/home/s3758869/synchain-absa-emotion/data/input_data/COVID-19-NLP/final/Corona_NLP_train_parsed.csv",
-            "tweet_column": "OriginalTweet",
+            "input": "/home/s3758869/synchain-absa-emotion/data/input_data/SenWave/processed/senwave_not_news_proc.csv",
+            "output": "/home/s3758869/synchain-absa-emotion/data/input_data/SenWave/final/senwave_not_news_proc.csv",
+            "tweet_column": "tweet",
+        },
+        {
+            "input": "/home/s3758869/synchain-absa-emotion/data/input_data/COVIDSenti/processed/covidsenti_full_not_news_proc.csv",
+            "output": "/home/s3758869/synchain-absa-emotion/data/input_data/COVIDSenti/final/covidsenti_full_not_news_proc.csv",
+            "tweet_column": "tweet",
         },
     ]
 

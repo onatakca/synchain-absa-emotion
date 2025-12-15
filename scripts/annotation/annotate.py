@@ -14,8 +14,8 @@ from scripts.qwen_model.qwen_model import generate_batch, load_model, generate_b
 
 N_SAMPLES = 50
 INPUT_FILE = "/home/s3758869/synchain-absa-emotion/data/input_data/COVIDSenti/final/COVIDSenti_full_parsed.csv"
-OUTPUT_FILE = f"/home/s3758869/synchain-absa-emotion/data/output_data/COVIDSenti_conversational_annotated_{N_SAMPLES}.json"
-CHECKPOINT_DIR = "/home/s3758869/synchain-absa-emotion/data/output_data/checkpoints"
+OUTPUT_FILE = f"/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-72b-instruct_annotation/COVIDSenti_conversational_annotated_{N_SAMPLES}.json"
+CHECKPOINT_DIR = "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-72b-instruct_annotation/checkpoints"
 
 MODEL_NAME = "Qwen/Qwen2.5-72B-Instruct"
 MODEL_DIR = "/home/s3758869/synchain-absa-emotion/models/Qwen2.5-72B-Instruct"
