@@ -4,17 +4,17 @@ from pathlib import Path
 
 import pandas as pd
 
-from scripts.annotation.parsing import extract_aspects, is_news_like
+from scripts.annotation.parsing import extract_aspects, extract_sentiment, extract_emotion
 from scripts.qwen_model.prompts import (prompt_aspect_extraction,
                                         prompt_emotion_classification,
                                         prompt_opinion_extraction,
                                         prompt_sentiment_classification,
                                         prompt_syntactic_parsing)
 
-from scripts.qwen_model.qwen_model import generate_batch, load_model, generate_batch_with_checkpoint
+from scripts.qwen_model.qwen_model import load_model, generate_batch_with_checkpoint
 
-N_SAMPLES = 50
-INPUT_FILE = "/home/s3758869/synchain-absa-emotion/data/input_data/COVIDSenti/final/COVIDSenti_full_parsed.csv"
+N_SAMPLES = 10000
+INPUT_FILE = "/home/s3758869/synchain-absa-emotion/data/input_data/chunks_for_teacher_model_ann/corona_nlp_test_not_news_proc_3459samples.csv"
 input_file_name = INPUT_FILE.split("/")[-1].split(".csv")[0]
 OUTPUT_FILE = f"/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-72b-instruct_annotation/{input_file_name}_conversational_annotated_{N_SAMPLES}.json"
 CHECKPOINT_DIR = "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-72b-instruct_annotation/checkpoints"
@@ -35,8 +35,6 @@ def save_checkpoint(data, stage, filename):
     print(f"Checkpoint saved: {stage} -> {checkpoint_path}")
 
 df = pd.read_csv(INPUT_FILE)
-df["is_news"] = df["tweet"].apply(is_news_like)
-df = df[~df["is_news"]].head(N_SAMPLES).copy()
 
 tweets = df["tweet"].tolist()
 conllus = df["conllu_parse"].tolist()
@@ -136,9 +134,13 @@ output_data = {}
 for i, tweet in enumerate(tweets):
     aspects_dict = {}
     aspect_sentiments = {}
+    aspect_sentiments_raw = {}
+    aspect_sentiments_label = {}
     aspect_syntactic = {}
     aspect_opinions = {}
     aspect_emotions = {}
+    aspect_emotions_raw = {}
+    aspect_emotions_label = {}
 
     aspect_id = 0
     for idx, (task, syn, op, sent, emo) in enumerate(
@@ -147,18 +149,22 @@ for i, tweet in enumerate(tweets):
         tweet_idx, _, _, aspect = task
         if tweet_idx == i:
             aspects_dict[aspect] = aspect_id
-            aspect_sentiments[aspect_id] = sent
+            aspect_sentiments_raw[aspect_id] = sent
+            aspect_sentiments_label[aspect_id] = extract_sentiment(sent)
             aspect_syntactic[aspect_id] = syn
             aspect_opinions[aspect_id] = op
-            aspect_emotions[aspect_id] = emo
+            aspect_emotions_raw[aspect_id] = emo
+            aspect_emotions_label[aspect_id] = extract_emotion(emo)
             aspect_id += 1
 
     output_data[tweet] = {
         "aspects": aspects_dict,
-        "aspect_sentiments": aspect_sentiments,
+        "aspect_sentiments_raw": aspect_sentiments_raw,
+        "aspect_sentiments_label": aspect_sentiments_label,
         "aspect_syntactic": aspect_syntactic,
         "aspect_opinions": aspect_opinions,
-        "aspect_emotions": aspect_emotions,
+        "aspect_emotions_raw": aspect_emotions_raw,
+        "aspect_emotions_label": aspect_emotions_label,
     }
 
 with open(OUTPUT_FILE, "w", encoding="utf-8") as f:

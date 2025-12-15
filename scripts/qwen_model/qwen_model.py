@@ -110,12 +110,17 @@ def generate_batch(model, tokenizer, prompts, max_new_tokens, batch_size=2):
             ).to(model.device)
             
             with torch.no_grad():
-                outputs = model.generate(**inputs, max_new_tokens=max_new_tokens)
+                outputs = model.generate(
+                    **inputs,
+                    max_new_tokens=max_new_tokens,
+                    do_sample=False,
+                    pad_token_id=tokenizer.pad_token_id,
+                    use_cache=True,
+                )
             
-            generated_ids = [
-                output_ids[len(input_ids):]
-                for input_ids, output_ids in zip(inputs.input_ids, outputs)
-            ]
+            # More efficient: slice directly instead of list comprehension
+            input_len = inputs.input_ids.shape[1]
+            generated_ids = outputs[:, input_len:]
             
             decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
             all_decoded.extend(decoded)
@@ -135,6 +140,7 @@ def generate_batch_with_checkpoint(
     max_new_tokens,
     batch_size,
     checkpoint_file,
+    checkpoint_interval=20,
 ):
     checkpoint_path = Path(checkpoint_file)
 
@@ -169,6 +175,7 @@ def generate_batch_with_checkpoint(
         print(f"[{checkpoint_path.name}] All {total} prompts already processed.")
         return all_decoded
 
+    batch_counter = 0
     with tqdm(total=total - start_idx,desc=f"Generating ({checkpoint_path.name})",unit=f"batch") as pbar:
         for i in range(start_idx, total, batch_size):
             batch_texts = texts[i : i + batch_size]
@@ -185,6 +192,9 @@ def generate_batch_with_checkpoint(
                 outputs = model.generate(
                     **inputs,
                     max_new_tokens=max_new_tokens,
+                    do_sample=False,
+                    pad_token_id=tokenizer.pad_token_id,
+                    use_cache=True,
                 )
 
             input_len = inputs.input_ids.shape[1]
@@ -196,9 +206,11 @@ def generate_batch_with_checkpoint(
             )
 
             all_decoded.extend(decoded)
+            batch_counter += 1
 
-            with open(checkpoint_path, "w", encoding="utf-8") as f:
-                json.dump(all_decoded, f, indent=2, ensure_ascii=False)
+            if batch_counter % checkpoint_interval == 0 or i + batch_size >= total:
+                with open(checkpoint_path, "w", encoding="utf-8") as f:
+                    json.dump(all_decoded, f, indent=2, ensure_ascii=False)
 
             del inputs, outputs, generated_ids
             torch.cuda.empty_cache()
