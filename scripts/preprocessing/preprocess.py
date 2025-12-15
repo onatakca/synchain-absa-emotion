@@ -13,11 +13,9 @@ try:
 except Exception:
    _HAS_TQDM = False
 
-# to run:
-# /home/s2457997/.venv/bin/python /home/s2457997/synchain-absa-emotion/scripts/preprocessing/preprocess.py
-BASE = "/home/s2457997/synchain-absa-emotion/data/input_data"
-# BASE = "/home/s3758869/synchain-absa-emotion/data/input_data"
-# BASE = "/home/s0000000/synchain-absa-emotion/data/input_data"
+PROJECT_ROOT = Path("/home/s2457997/synchain-absa-emotion")
+INPUT_DATA_DIR = PROJECT_ROOT / "data" / "input_data"
+OUTPUT_DATA_DIR = PROJECT_ROOT / "data" / "output_data"
 
 
 def fix_and_remove_emojis(s: str) -> str:
@@ -25,14 +23,12 @@ def fix_and_remove_emojis(s: str) -> str:
    s = emoji.replace_emoji(s, "")      
    return s
 
-def preprocess_dataset(input_file, output_file, tweet_column):
-   df = pd.read_csv(input_file, encoding="latin1")
+def strip_urls(text: str) -> str:
+   if not isinstance(text, str):
+      return text
+   return re.sub(r"https?://\S+|www\.\S+", "", text)
 
-   if tweet_column in df.columns:
-      df[tweet_column] = df[tweet_column].apply(fix_and_remove_emojis)
-
-   Path(output_file).parent.mkdir(parents=True, exist_ok=True)
-   df.to_csv(output_file, index=False)
+# Removed old generic preprocessing helper; per-dataset transforms are implemented in main().
 
 # news categorization with Qwen 7B
 
@@ -69,6 +65,10 @@ def _classify_tweet(model, tokenizer, tweet: str, prompt_template: str) -> str:
 
    prompt = _build_prompt(tweet, prompt_template)
    inputs = tokenizer(prompt, return_tensors="pt")
+
+   if hasattr(model, "device"):
+      inputs = {key: value.to(model.device) for key, value in inputs.items()}
+
    outputs = model.generate(
       **inputs,
       max_new_tokens=5,
@@ -109,43 +109,48 @@ def _heuristic_classify(tweet: str) -> str:
       return "news"
    return "not news"
 
-def llm_news_categorization(input_file: str, tweet_column: str, output_file: str):
-   print("Loading Qwen model for news categorization...")
-   # Prefer Qwen2.5-7B-Instruct; allow local path via env QWEN_LOCAL_PATH
-   default_model_id = "Qwen/Qwen2.5-7B-Instruct"
-   local_candidates = [
+def _sanitize_name(value: str) -> str:
+   sanitized = re.sub(r"[^A-Za-z0-9]+", "_", value)
+   return sanitized.strip("_").lower()
+
+def load_news_classifier():
+   print("Initializing news classifier...")
+
+   candidate_paths = [
       os.environ.get("QWEN_LOCAL_PATH", "").strip(),
       "/home/s2457997/synchain-absa-emotion/models/Qwen2.5-7B-Instruct",
       "/home/s2457997/synchain-absa-emotion/models/Qwen1.5-7B-Chat",
-      "/home/s3758869/synchain-absa-emotion/models/Qwen2.5-72B-Instruct",
-      "/home/s3758869/synchain-absa-emotion/models/Qwen2.5-7B-Instruct",
    ]
-   local_candidates = [p for p in local_candidates if p]
+   candidate_paths = [path for path in candidate_paths if path]
 
    tokenizer = None
    model = None
-   load_errors = []
+   load_messages = []
 
-   # Try local paths first to avoid network issues on cluster
-   for path in local_candidates:
-      if os.path.isdir(path):
-         try:
-            print(f"Trying local model at: {path}")
-            tokenizer = AutoTokenizer.from_pretrained(path, local_files_only=True, trust_remote_code=True)
-            model = AutoModelForCausalLM.from_pretrained(
-               path,
-               local_files_only=True,
-               trust_remote_code=True,
-               torch_dtype="auto",
-               device_map="auto",
-            )
-            break
-         except Exception as e:
-            load_errors.append(f"Local load failed at {path}: {e}")
+   for candidate_path in candidate_paths:
+      try:
+         if candidate_path and Path(candidate_path).is_dir():
+            try:
+               print(f"Trying local model at: {candidate_path}")
+               tokenizer = AutoTokenizer.from_pretrained(candidate_path, local_files_only=True, trust_remote_code=True)
+               model = AutoModelForCausalLM.from_pretrained(
+                  candidate_path,
+                  local_files_only=True,
+                  trust_remote_code=True,
+                  torch_dtype="auto",
+                  device_map="auto",
+               )
+               print(f"Loaded local model from {candidate_path}")
+               break
+            except Exception as error:
+               load_messages.append(f"Local load failed at {candidate_path}: {error}")
+      except PermissionError as perr:
+         load_messages.append(f"Permission denied checking {candidate_path}: {perr}")
 
-   # If no local model loaded, try remote unless offline mode is enforced
-   offline = os.environ.get("HF_HUB_OFFLINE", "").strip() or os.environ.get("TRANSFORMERS_OFFLINE", "").strip()
-   if model is None and not offline:
+   offline_mode = bool(os.environ.get("HF_HUB_OFFLINE", "").strip() or os.environ.get("TRANSFORMERS_OFFLINE", "").strip())
+   default_model_id = "Qwen/Qwen2.5-7B-Instruct"
+
+   if model is None and not offline_mode:
       try:
          print(f"Falling back to remote model: {default_model_id}")
          tokenizer = AutoTokenizer.from_pretrained(default_model_id, trust_remote_code=True)
@@ -155,130 +160,229 @@ def llm_news_categorization(input_file: str, tweet_column: str, output_file: str
             torch_dtype="auto",
             device_map="auto",
          )
-      except Exception as e:
+         print(f"Loaded remote model: {default_model_id}")
+      except Exception as error:
          print("Could not load model from Hugging Face; will use heuristic fallback.")
-         for err in load_errors:
-            print(err)
-         print(f"Remote load error: {e}")
+         for message in load_messages:
+            print(message)
+         print(f"Remote load error: {error}")
          print("Tip: set QWEN_LOCAL_PATH to a local model directory (e.g., models/Qwen2.5-7B-Instruct) to use LLM.")
          model = None
          tokenizer = None
-   elif model is None and offline:
+   elif model is None and offline_mode:
       print("HF offline mode is set and no local model path found; using heuristic fallback.")
 
-   print(f"Reading preprocessed data: {input_file}")
-   df = pd.read_csv(input_file, encoding="latin1")
-   if tweet_column not in df.columns:
-      raise ValueError(f"Column '{tweet_column}' not found in {input_file}")
-
-   # Polite resource usage: cap CPU threads to be nice on shared systems
    try:
       torch.set_num_threads(max(1, torch.get_num_threads() // 2))
    except Exception:
       pass
 
-   # Resume support: if output exists, load and keep previously classified rows
-   existing = None
-   if Path(output_file).exists():
-      try:
-         existing = pd.read_csv(output_file, encoding="latin1")
-      except Exception:
-         existing = None
-   if existing is not None and "news_category" in existing.columns:
-      # Align on index length; merge by position to keep simple and robust
-      if len(existing) == len(df):
-         df["news_category"] = existing["news_category"]
-      else:
-         # Fallback: only copy what's available
-         available = min(len(existing), len(df))
-         df.loc[:available-1, "news_category"] = existing.loc[:available-1, "news_category"]
+   mode_description = "LLM" if model is not None else "heuristic"
+   return model, tokenizer, mode_description
 
-   examples = _get_5_shot_examples() if model is not None else None
-   tweets = df[tweet_column].tolist()
-   Path(output_file).parent.mkdir(parents=True, exist_ok=True)
-
-   # Process with incremental saving and graceful interrupt handling
-   mode_desc = "LLM" if model is not None else "heuristic"
-   print(f"Classifying tweets with incremental saving (mode={mode_desc})...")
-   save_every = 5
-   try:
-      iterator = enumerate(tweets)
-      if _HAS_TQDM:
-         iterator = enumerate(tqdm(tweets, desc="News classification"))
-      for idx, t in iterator:
-         # Skip already classified
-         if "news_category" in df.columns and isinstance(df.at[idx, "news_category"], str):
-            continue
-         if model is not None:
-            label = _classify_tweet(model, tokenizer, t, examples)
-         else:
-            label = _heuristic_classify(t)
-         df.at[idx, "news_category"] = label
-         # Print immediate feedback for logs
-         preview = str(t).replace("\n", " ").strip()
-         if len(preview) > 240:
-            preview = preview[:240] + "..."
-         print(f"[{idx+1}/{len(tweets)}] {label}: {preview}")
-         sys.stdout.flush()
-         if (idx + 1) % save_every == 0:
-            df.to_csv(output_file, index=False)
-      # Final save
-      df.to_csv(output_file, index=False)
-   except KeyboardInterrupt:
-      print("Interrupted. Saving partial results...")
-      df.to_csv(output_file, index=False)
-   except Exception as e:
-      print(f"Error during classification: {e}. Saving partial results...")
-      df.to_csv(output_file, index=False)
-
-# TODO : Salih
-# note : from SenWave remove all that are in category Denial,Official report,Joking
-# note : from covid_sentti remove labels and from COVID-19-NLP all other columns
-# output files for COVID-19-NLP and CovidSneti must be tweet, original_sentiment
-
-# todo : Salih
-# from all non news tweets, remove
-# links
-
-def llm_tweet_annotation(model, tokenizer, input_file, output_file, tweet_column):
-   #TODO: Salih to implement LLM news annotation. 
-   # remove also non informational tweets like : #media #corona vrius 
-   # or like #coronasucks .
-   # add column is_news or is_usefu
-   pass
-
-def main():
-   datasets = [
+def build_dataset_configurations():
+   dataset_specs = [
       {
-         "input": f"{BASE}/SenWave/raw/SenWave.csv",
-         "output": f"{BASE}/SenWave/processed/SenWave_proc.csv",
+         "name": "SenWave",
+         "relative_input": Path("SenWave/raw/SenWave.csv"),
          "tweet_column": "Tweet",
       },
       {
-         "input": f"{BASE}/COVIDSenti/raw/COVIDSenti-Full.csv",
-         "output": f"{BASE}/COVIDSenti/processed/COVIDSenti_full_proc.csv",
+         "name": "COVIDSenti_full",
+         "relative_input": Path("COVIDSenti/raw/COVIDSenti-Full.csv"),
          "tweet_column": "tweet",
       },
       {
-         "input": f"{BASE}/COVID-19-NLP/raw/Corona_NLP_test.csv",
-         "output": f"{BASE}/COVID-19-NLP/processed/Corona_NLP_test_proc.csv",
+         "name": "COVID_19_NLP_test",
+         "relative_input": Path("COVID-19-NLP/raw/Corona_NLP_test.csv"),
          "tweet_column": "OriginalTweet",
       },
       {
-         "input": f"{BASE}/COVID-19-NLP/raw/Corona_NLP_train.csv",
-         "output": f"{BASE}/COVID-19-NLP/processed/Corona_NLP_train_proc.csv",
+         "name": "COVID_19_NLP_train",
+         "relative_input": Path("COVID-19-NLP/raw/Corona_NLP_train.csv"),
          "tweet_column": "OriginalTweet",
       },
    ]
-   for dataset in datasets:
-      preprocess_dataset(dataset["input"], dataset["output"], dataset["tweet_column"])
 
-   # Run news categorization only for COVID-19-NLP test split to validate pipeline
-   llm_news_categorization(
-      input_file=f"{BASE}/COVID-19-NLP/processed/Corona_NLP_test_proc.csv",
-      tweet_column="OriginalTweet",
-      output_file="/home/s2457997/synchain-absa-emotion/data/output_data/Corona_NLP_test_categorized.csv",
-   )
+   configurations = []
+   for spec in dataset_specs:
+      input_path = INPUT_DATA_DIR / spec["relative_input"]
+      dataset_root = spec["relative_input"].parts[0]
+      sanitized_stem = _sanitize_name(spec["relative_input"].stem)
+
+      processed_path = INPUT_DATA_DIR / dataset_root / "processed" / f"{sanitized_stem}_proc.csv"
+      processed_dir = INPUT_DATA_DIR / dataset_root / "processed"
+
+      configurations.append(
+         {
+            "name": spec["name"],
+            "tweet_column": spec["tweet_column"],
+            "input_path": input_path,
+            "processed_path": processed_path,
+            "processed_dir": processed_dir,
+            "sanitized_stem": sanitized_stem,
+         }
+      )
+
+   return configurations
+# Dataset-specific processing rules are implemented in main();
+# outputs are exactly the two partitioned CSVs per dataset (news / not news).
+
+def llm_tweet_annotation(model, tokenizer, input_file, output_file, tweet_column, save_frequency=25, mode_description="heuristic"):
+   print(f"Annotating {input_file} → {output_file}")
+   dataframe = pd.read_csv(input_file, encoding="latin1")
+
+   if tweet_column not in dataframe.columns:
+      raise ValueError(f"Column '{tweet_column}' not found in {input_file}")
+
+   # Attempt to resume from previous annotation results if available.
+   existing_annotations = None
+   if Path(output_file).exists():
+      try:
+         existing_annotations = pd.read_csv(output_file, encoding="latin1")
+      except Exception:
+         existing_annotations = None
+
+   if existing_annotations is not None and "news_category" in existing_annotations.columns:
+      if len(existing_annotations) == len(dataframe):
+         dataframe["news_category"] = existing_annotations["news_category"]
+      else:
+         overlap_count = min(len(existing_annotations), len(dataframe))
+         dataframe.loc[:overlap_count - 1, "news_category"] = existing_annotations.loc[:overlap_count - 1, "news_category"]
+
+   examples = _get_5_shot_examples() if model is not None else None
+   tweets = dataframe[tweet_column].tolist()
+
+   Path(output_file).parent.mkdir(parents=True, exist_ok=True)
+   print(f"Classifying tweets with incremental saving (mode={mode_description})...")
+
+   iterator = enumerate(tweets)
+   if _HAS_TQDM:
+      iterator = enumerate(tqdm(tweets, desc="News classification"))
+
+   try:
+      for index, tweet_text in iterator:
+         already_labeled = "news_category" in dataframe.columns and isinstance(dataframe.at[index, "news_category"], str)
+         if already_labeled:
+            continue
+
+         if model is not None:
+            label = _classify_tweet(model, tokenizer, tweet_text, examples)
+         else:
+            label = _heuristic_classify(tweet_text)
+
+         dataframe.at[index, "news_category"] = label
+
+         preview_text = str(tweet_text).replace("\n", " ").strip()
+         if len(preview_text) > 240:
+            preview_text = preview_text[:240] + "..."
+         print(f"[{index + 1}/{len(tweets)}] {label}: {preview_text}")
+         sys.stdout.flush()
+
+         if (index + 1) % save_frequency == 0:
+            dataframe.to_csv(output_file, index=False)
+
+      dataframe.to_csv(output_file, index=False)
+   except KeyboardInterrupt:
+      print("Interrupted. Saving partial results...")
+      dataframe.to_csv(output_file, index=False)
+   except Exception as error:
+      print(f"Error during classification: {error}. Saving partial results...")
+      dataframe.to_csv(output_file, index=False)
+
+def main():
+   datasets = build_dataset_configurations()
+
+   def load_and_transform_dataset(cfg):
+      df = pd.read_csv(cfg["input_path"], encoding="latin1")
+      name = cfg["name"].lower()
+      if name == "senwave":
+         if "Tweet" not in df.columns:
+            raise ValueError("SenWave: 'Tweet' column missing")
+         # Filter out specified categories (drop rows where any equals 1)
+         for col in ["Denial", "Official report", "Joking"]:
+            if col not in df.columns:
+               raise ValueError(f"SenWave: expected column '{col}' not found")
+         mask_drop = (df["Denial"] == 1) | (df["Official report"] == 1) | (df["Joking"] == 1)
+         df = df.loc[~mask_drop].copy()
+         # Standardize tweet column name
+         df.rename(columns={"Tweet": "tweet"}, inplace=True)
+         df["tweet"] = df["tweet"].apply(fix_and_remove_emojis)
+         return df
+      elif name == "covidsenti_full":
+         needed = ["tweet", "label"]
+         for n in needed:
+            if n not in df.columns:
+               raise ValueError(f"COVIDSenti: expected column '{n}' not found")
+         out = df[["tweet", "label"]].copy()
+         out.rename(columns={"label": "original_sentiment"}, inplace=True)
+         out["tweet"] = out["tweet"].apply(fix_and_remove_emojis)
+         return out
+      elif name in ("covid_19_nlp_test", "covid_19_nlp_train"):
+         needed = ["OriginalTweet", "Sentiment"]
+         for n in needed:
+            if n not in df.columns:
+               raise ValueError(f"COVID-19-NLP: expected column '{n}' not found")
+         out = df[["OriginalTweet", "Sentiment"]].copy()
+         out.rename(columns={"OriginalTweet": "tweet", "Sentiment": "original_sentiment"}, inplace=True)
+         out["tweet"] = out["tweet"].apply(fix_and_remove_emojis)
+         return out
+      else:
+         raise ValueError(f"Unknown dataset name: {cfg['name']}")
+
+   # 1) Transform and write a canonical processed CSV per dataset
+   for cfg in datasets:
+      cfg["processed_dir"].mkdir(parents=True, exist_ok=True)
+      df_proc = load_and_transform_dataset(cfg)
+      df_proc.to_csv(cfg["processed_path"], index=False)
+
+   # 2) Annotate using LLM/heuristic; 3) Partition into news / not-news
+   model, tokenizer, mode_description = load_news_classifier()
+   for cfg in datasets:
+      tmp_annot = cfg["processed_dir"] / f"{cfg['sanitized_stem']}_categorised_tmp.csv"
+      llm_tweet_annotation(
+         model=model,
+         tokenizer=tokenizer,
+         input_file=cfg["processed_path"],
+         output_file=tmp_annot,
+         tweet_column="tweet",
+         mode_description=mode_description,
+      )
+
+      annotated = pd.read_csv(tmp_annot, encoding="latin1")
+      if "news_category" not in annotated.columns:
+         raise ValueError(f"Annotation failed for {cfg['name']}: 'news_category' missing")
+
+      news_df = annotated[annotated["news_category"].str.lower() == "news"].copy()
+      not_news_df = annotated[annotated["news_category"].str.lower() != "news"].copy()
+
+      # Strip URLs from non-news tweets
+      if "tweet" in not_news_df.columns:
+         not_news_df["tweet"] = not_news_df["tweet"].apply(strip_urls)
+
+      # Drop helper column before saving final partitions
+      for d in (news_df, not_news_df):
+         if "news_category" in d.columns:
+            d.drop(columns=["news_category"], inplace=True)
+
+      final_news = cfg["processed_dir"] / f"{cfg['sanitized_stem']}_news_proc.csv"
+      final_not_news = cfg["processed_dir"] / f"{cfg['sanitized_stem']}_not_news_proc.csv"
+
+      # 4) Write final outputs then clean up only files for this dataset
+      news_df.to_csv(final_news, index=False)
+      not_news_df.to_csv(final_not_news, index=False)
+      # Remove tmp and prior intermediates for this dataset only
+      try:
+         if tmp_annot.exists():
+            tmp_annot.unlink()
+      except Exception:
+         pass
+      for p in cfg["processed_dir"].glob(f"{cfg['sanitized_stem']}_*.csv"):
+         if p.name not in {final_news.name, final_not_news.name}:
+            try:
+               p.unlink()
+            except Exception:
+               pass
 
 if __name__ == "__main__":
    main()

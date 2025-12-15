@@ -32,9 +32,7 @@ fi
 # Prefer a local model path if present to avoid network
 for CAND in \
 	"/home/s2457997/synchain-absa-emotion/models/Qwen2.5-7B-Instruct" \
-	"/home/s2457997/synchain-absa-emotion/models/Qwen1.5-7B-Chat" \
-	"/home/s3758869/synchain-absa-emotion/models/Qwen2.5-72B-Instruct" \
-	"/home/s3758869/synchain-absa-emotion/models/Qwen2.5-7B-Instruct"; do
+	"/home/s2457997/synchain-absa-emotion/models/Qwen1.5-7B-Chat"; do
 	if [ -d "$CAND" ]; then
 		export QWEN_LOCAL_PATH="$CAND"
 		echo "Using local model at: $QWEN_LOCAL_PATH"
@@ -70,4 +68,6 @@ echo "HF_HOME=$HF_HOME"
 "$PYTHON" /home/s2457997/synchain-absa-emotion/scripts/preprocessing/preprocess.py
 
 # Tail result location
-echo "Done. Check output: /home/s2457997/synchain-absa-emotion/data/output_data/Corona_NLP_test_categorized.csv"
+echo "Done. Categorised outputs are in: /home/s2457997/synchain-absa-emotion/data/output_data"
+echo "Examples:"
+ls -1 /home/s2457997/synchain-absa-emotion/data/output_data/*_categorised.csv 2>/dev/null || echo "(No categorised files yet)"
