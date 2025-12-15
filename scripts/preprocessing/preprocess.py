@@ -1,3 +1,6 @@
+import os
+import sys
+import re
 import pandas as pd
 from ftfy import fix_text
 import emoji
@@ -77,16 +80,91 @@ def _classify_tweet(model, tokenizer, tweet: str, prompt_template: str) -> str:
       return "news"
    return "not news"
 
+def _heuristic_classify(tweet: str) -> str:
+   if not isinstance(tweet, str) or not tweet.strip():
+      return "not news"
+   t = tweet.strip()
+   tl = t.lower()
+   # Fast URL detection
+   if re.search(r"https?://", tl):
+      # Likely news if common outlets or headline-y phrasing
+      news_domains = [
+         "reuters", "apnews", "associated press", "bbc", "cnn", "nytimes",
+         "washingtonpost", "wsj", "bloomberg", "guardian", "aljazeera",
+         "foxnews", "nbcnews", "abcnews", "cbsnews", "usatoday", "politico",
+      ]
+      if any(nd in tl for nd in news_domains):
+         return "news"
+   keywords = [
+      "breaking:", "breaking -", "breaking ", "live updates", "live: ",
+      "reports", "report:", "according to", "says ", "say ", "announces",
+      "confirmed", "official", "press release", "update:", "updates:",
+   ]
+   if any(k in tl for k in keywords):
+      return "news"
+   # Headline style: many Title Case words with minimal pronouns
+   words = re.findall(r"[A-Za-z]+", t)
+   title_like = sum(1 for w in words[:12] if len(w) > 2 and w[0].isupper())
+   if title_like >= 6 and not any(p in tl for p in [" i ", " my ", " we ", " me "]):
+      return "news"
+   return "not news"
+
 def llm_news_categorization(input_file: str, tweet_column: str, output_file: str):
    print("Loading Qwen model for news categorization...")
-   model_name = "Qwen/Qwen1.5-7B-Chat"
+   # Prefer Qwen2.5-7B-Instruct; allow local path via env QWEN_LOCAL_PATH
+   default_model_id = "Qwen/Qwen2.5-7B-Instruct"
+   local_candidates = [
+      os.environ.get("QWEN_LOCAL_PATH", "").strip(),
+      "/home/s2457997/synchain-absa-emotion/models/Qwen2.5-7B-Instruct",
+      "/home/s2457997/synchain-absa-emotion/models/Qwen1.5-7B-Chat",
+      "/home/s3758869/synchain-absa-emotion/models/Qwen2.5-72B-Instruct",
+      "/home/s3758869/synchain-absa-emotion/models/Qwen2.5-7B-Instruct",
+   ]
+   local_candidates = [p for p in local_candidates if p]
 
-   tokenizer = AutoTokenizer.from_pretrained(model_name)
-   model = AutoModelForCausalLM.from_pretrained(
-      model_name,
-      torch_dtype="auto",
-      device_map="auto",
-   )
+   tokenizer = None
+   model = None
+   load_errors = []
+
+   # Try local paths first to avoid network issues on cluster
+   for path in local_candidates:
+      if os.path.isdir(path):
+         try:
+            print(f"Trying local model at: {path}")
+            tokenizer = AutoTokenizer.from_pretrained(path, local_files_only=True, trust_remote_code=True)
+            model = AutoModelForCausalLM.from_pretrained(
+               path,
+               local_files_only=True,
+               trust_remote_code=True,
+               torch_dtype="auto",
+               device_map="auto",
+            )
+            break
+         except Exception as e:
+            load_errors.append(f"Local load failed at {path}: {e}")
+
+   # If no local model loaded, try remote unless offline mode is enforced
+   offline = os.environ.get("HF_HUB_OFFLINE", "").strip() or os.environ.get("TRANSFORMERS_OFFLINE", "").strip()
+   if model is None and not offline:
+      try:
+         print(f"Falling back to remote model: {default_model_id}")
+         tokenizer = AutoTokenizer.from_pretrained(default_model_id, trust_remote_code=True)
+         model = AutoModelForCausalLM.from_pretrained(
+            default_model_id,
+            trust_remote_code=True,
+            torch_dtype="auto",
+            device_map="auto",
+         )
+      except Exception as e:
+         print("Could not load model from Hugging Face; will use heuristic fallback.")
+         for err in load_errors:
+            print(err)
+         print(f"Remote load error: {e}")
+         print("Tip: set QWEN_LOCAL_PATH to a local model directory (e.g., models/Qwen2.5-7B-Instruct) to use LLM.")
+         model = None
+         tokenizer = None
+   elif model is None and offline:
+      print("HF offline mode is set and no local model path found; using heuristic fallback.")
 
    print(f"Reading preprocessed data: {input_file}")
    df = pd.read_csv(input_file, encoding="latin1")
@@ -115,13 +193,14 @@ def llm_news_categorization(input_file: str, tweet_column: str, output_file: str
          available = min(len(existing), len(df))
          df.loc[:available-1, "news_category"] = existing.loc[:available-1, "news_category"]
 
-   examples = _get_5_shot_examples()
+   examples = _get_5_shot_examples() if model is not None else None
    tweets = df[tweet_column].tolist()
    Path(output_file).parent.mkdir(parents=True, exist_ok=True)
 
    # Process with incremental saving and graceful interrupt handling
-   print("Classifying tweets with incremental saving...")
-   save_every = 100
+   mode_desc = "LLM" if model is not None else "heuristic"
+   print(f"Classifying tweets with incremental saving (mode={mode_desc})...")
+   save_every = 5
    try:
       iterator = enumerate(tweets)
       if _HAS_TQDM:
@@ -130,7 +209,17 @@ def llm_news_categorization(input_file: str, tweet_column: str, output_file: str
          # Skip already classified
          if "news_category" in df.columns and isinstance(df.at[idx, "news_category"], str):
             continue
-         df.at[idx, "news_category"] = _classify_tweet(model, tokenizer, t, examples)
+         if model is not None:
+            label = _classify_tweet(model, tokenizer, t, examples)
+         else:
+            label = _heuristic_classify(t)
+         df.at[idx, "news_category"] = label
+         # Print immediate feedback for logs
+         preview = str(t).replace("\n", " ").strip()
+         if len(preview) > 240:
+            preview = preview[:240] + "..."
+         print(f"[{idx+1}/{len(tweets)}] {label}: {preview}")
+         sys.stdout.flush()
          if (idx + 1) % save_every == 0:
             df.to_csv(output_file, index=False)
       # Final save

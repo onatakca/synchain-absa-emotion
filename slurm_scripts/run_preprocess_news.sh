@@ -15,6 +15,7 @@ set -euo pipefail
 
 # Create logs directory if missing
 mkdir -p /home/s2457997/synchain-absa-emotion/logs
+mkdir -p /home/s2457997/synchain-absa-emotion/hf_cache
 
 # Load modules if your cluster uses them (uncomment and adjust as needed)
 # module purge
@@ -28,6 +29,26 @@ if [ ! -x "$PYTHON" ]; then
 	PYTHON="$(command -v python3 || command -v python)"
 fi
 
+# Prefer a local model path if present to avoid network
+for CAND in \
+	"/home/s2457997/synchain-absa-emotion/models/Qwen2.5-7B-Instruct" \
+	"/home/s2457997/synchain-absa-emotion/models/Qwen1.5-7B-Chat" \
+	"/home/s3758869/synchain-absa-emotion/models/Qwen2.5-72B-Instruct" \
+	"/home/s3758869/synchain-absa-emotion/models/Qwen2.5-7B-Instruct"; do
+	if [ -d "$CAND" ]; then
+		export QWEN_LOCAL_PATH="$CAND"
+		echo "Using local model at: $QWEN_LOCAL_PATH"
+		break
+	fi
+done
+
+# Set HF caches inside repo to keep artifacts contained
+export HF_HOME="/home/s2457997/synchain-absa-emotion/hf_cache"
+export TRANSFORMERS_CACHE="$HF_HOME/transformers"
+export HF_HUB_DISABLE_TELEMETRY=1
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+
 # Show environment summary
 nvidia-smi || true
 "$PYTHON" -V
@@ -39,6 +60,8 @@ try:
 except Exception as e:
 	print('Torch not available:', e)
 "
+echo "QWEN_LOCAL_PATH=${QWEN_LOCAL_PATH:-<none>}"
+echo "HF_HOME=$HF_HOME"
 
 # Be nice to shared node: limit torch threads
 "$PYTHON" -c "import torch; torch.set_num_threads(max(1, torch.get_num_threads()//2)); print('Threads:', torch.get_num_threads())" || true
