@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -14,8 +15,11 @@ from scripts.qwen_model.qwen_model import generate_batch, load_model, generate_b
 
 N_SAMPLES = 50
 INPUT_FILE = "/home/s3758869/synchain-absa-emotion/data/input_data/COVIDSenti/final/COVIDSenti_full_parsed.csv"
-OUTPUT_FILE = f"/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-72b-instruct_annotation/COVIDSenti_conversational_annotated_{N_SAMPLES}.json"
+input_file_name = INPUT_FILE.split("/")[-1].split(".csv")[0]
+OUTPUT_FILE = f"/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-72b-instruct_annotation/{input_file_name}_conversational_annotated_{N_SAMPLES}.json"
 CHECKPOINT_DIR = "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-72b-instruct_annotation/checkpoints"
+
+os.makedirs(OUTPUT_FILE, exist_ok=True)
 
 MODEL_NAME = "Qwen/Qwen2.5-72B-Instruct"
 MODEL_DIR = "/home/s3758869/synchain-absa-emotion/models/Qwen2.5-72B-Instruct"
