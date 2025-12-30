@@ -3,10 +3,9 @@
 #SBATCH --partition=students
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=01:00:00
+#SBATCH --time=480:00:00
 #SBATCH --mem=40G
-#SBATCH --output=/home/s3758869/synchain-absa-emotion/slurm_outputs/qwen_annotation_%j.out
-#SBATCH --error=/home/s3758869/synchain-absa-emotion/slurm_outputs/qwen_annotation_%j.err
+#SBATCH --output=annotation_conversational_%j.log
 
 echo "Job ID: $SLURM_JOB_ID"
 echo "GPU Information:"
