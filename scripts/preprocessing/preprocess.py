@@ -9,53 +9,75 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from tqdm import tqdm
 
-PROJECT_ROOT = Path("/home/s2457997/synchain-absa-emotion")
-INPUT_DATA_DIR = PROJECT_ROOT / "data" / "input_data"
-OUTPUT_DATA_DIR = PROJECT_ROOT / "data" / "output_data"
-
+PROJECT_ROOT = Path("/home/s3758869/synchain-absa-emotion")
+DATA_DIR = PROJECT_ROOT / "data" / "input_data"
 
 def fix_and_remove_emojis(s: str) -> str:
-   s = fix_text(str(s))               
-   s = emoji.replace_emoji(s, "")      
+   s = fix_text(str(s))
+   s = emoji.replace_emoji(s, "")
    return s
 
+def is_tweet_cut_off(tweet, pattern="‚Ä¶"):
+   if not isinstance(tweet, str):
+      return False
+   return tweet.endswith(pattern)
+   
 def strip_urls(text: str) -> str:
    if not isinstance(text, str):
       return text
    return re.sub(r"https?://\S+|www\.\S+", "", text)
 
+def standardize_sentiment(sentiment: str) -> str:
+   if not isinstance(sentiment, str):
+      return sentiment
+   sentiment_lower = sentiment.lower().strip()
+   sentiment_map = {
+      "neu": "neutral",
+      "pos": "positive",
+      "neg": "negative"
+   }
+   return sentiment_map.get(sentiment_lower, sentiment)
+
 def _get_5_shot_examples() -> str:
-   return (
-      """
-      Here are some examples of tweets. Classify them as 'news' or 'not news'.
+   return """Here are some examples of tweets. Classify them as 'news' or 'not news'.
 
-      Tweet: "US stock futures and Asian shares fall after Trump says he and first lady have tested positive for Covid-19 https://t.co/y2a5Z3n5qS https://t.co/n534Mcm2cT"
-      Classification: news
+Tweet: "US stock futures and Asian shares fall after Trump says he and first lady have tested positive for Covid-19 https://t.co/y2a5Z3n5qS https://t.co/n534Mcm2cT"
+Classification: news
 
-      Tweet: "Oil prices fall as much as 5% after Trump tests positive for COVID-19 https://t.co/38pLd2i37l https://t.co/9r4V3A0p3x"
-      Classification: news
+Tweet: "Oil prices fall as much as 5% after Trump tests positive for COVID-19 https://t.co/38pLd2i37l https://t.co/9r4V3A0p3x"
+Classification: news
 
-      Tweet: "Trump says he and first lady have tested positive for coronavirus - follow live https://t.co/d5R43O9033"
-      Classification: news
+Tweet: "Trump says he and first lady have tested positive for coronavirus - follow live https://t.co/d5R43O9033"
+Classification: news
 
-      Tweet: "President Trump and the first lady have tested positive for Covid-19. The announcement comes after a top aide, Hope Hicks, tested positive for the virus. Here's what we know. https://t.co/oW23SjI95f"
-      Classification: news
+Tweet: "President Trump and the first lady have tested positive for Covid-19. The announcement comes after a top aide, Hope Hicks, tested positive for the virus. Here's what we know. https://t.co/oW23SjI95f"
+Classification: news
 
-      Tweet: "Panic food buying in Germany due to #coronavirus has begun.  But the #organic is left behind! #Hamsterkauf"
-      Classification: not news
-      
-      Tweet: "#Covid_19 Went to the Grocery Store, turns out all cleaning supplies have been bought out for fear of Coronavirus."
-      Classification: not news
-      
-      Tweet: "BREAKING: President Trump and first lady Melania Trump test positive for Covid-19 https://t.co/w5nU8p2d5X"
-      Classification: news
-      """
-   )
+Tweet: "Panic food buying in Germany due to #coronavirus has begun.  But the #organic is left behind! #Hamsterkauf"
+Classification: not news
+
+Tweet: "#Covid_19 Went to the Grocery Store, turns out all cleaning supplies have been bought out for fear of Coronavirus."
+Classification: not news
+
+Tweet: "Virologists weigh in on novel coronavirus in China's outbreak https://t.co/w5nU8p2vf3"
+Classification: news
+
+Tweet: "Abu Dhabi launches coronavirus website"
+Classification: news
+
+Tweet: First Coronavirus death outside of China as man, 44, dies in Philippines
+Classification: news
+
+Tweet: Harvard and MIT tell students not to return from spring break due to coronavirus - MIT Technology Review
+Classification: news
+
+Tweet: "BREAKING: President Trump and first lady Melania Trump test positive for Covid-19 https://t.co/w5nU8p2d5X"
+Classification: news"""
 
 def _build_prompt(tweet: str, examples: str) -> str:
    return f"""{examples}
-      Tweet: "{tweet}"
-      Classification:"""
+Tweet: "{tweet}"
+Classification:"""
 
 def _classify_tweet(model, tokenizer, tweet: str, prompt_template: str) -> str:
    if not isinstance(tweet, str) or not tweet.strip():
@@ -78,105 +100,27 @@ def _classify_tweet(model, tokenizer, tweet: str, prompt_template: str) -> str:
       return "news"
    return "not news"
 
-def _heuristic_classify(tweet: str) -> str:
-   if not isinstance(tweet, str) or not tweet.strip():
-      return "not news"
-   t = tweet.strip()
-   tl = t.lower()
-   # Fast URL detection
-   if re.search(r"https?://", tl):
-      # Likely news if common outlets or headline-y phrasing
-      news_domains = [
-         "reuters", "apnews", "associated press", "bbc", "cnn", "nytimes",
-         "washingtonpost", "wsj", "bloomberg", "guardian", "aljazeera",
-         "foxnews", "nbcnews", "abcnews", "cbsnews", "usatoday", "politico",
-      ]
-      if any(nd in tl for nd in news_domains):
-         return "news"
-   keywords = [
-      "breaking:", "breaking -", "breaking ", "live updates", "live: ",
-      "reports", "report:", "according to", "says ", "say ", "announces",
-      "confirmed", "official", "press release", "update:", "updates:",
-   ]
-   if any(k in tl for k in keywords):
-      return "news"
-   # Headline style: many Title Case words with minimal pronouns
-   words = re.findall(r"[A-Za-z]+", t)
-   title_like = sum(1 for w in words[:12] if len(w) > 2 and w[0].isupper())
-   if title_like >= 6 and not any(p in tl for p in [" i ", " my ", " we ", " me "]):
-      return "news"
-   return "not news"
-
 def _sanitize_name(value: str) -> str:
    sanitized = re.sub(r"[^A-Za-z0-9]+", "_", value)
    return sanitized.strip("_").lower()
 
 def load_news_classifier():
-   print("Initializing news classifier...")
+   model_path = "/home/s3758869/synchain-absa-emotion/models/Qwen2.5-7B-Instruct"
+   
+   print(f"Loading model from: {model_path}")
+   tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True, trust_remote_code=True)
+   model = AutoModelForCausalLM.from_pretrained(
+      model_path,
+      local_files_only=True,
+      trust_remote_code=True,
+      torch_dtype="auto",
+      device_map="auto",
+   )
+   print(f"Model loaded successfully")
 
-   candidate_paths = [
-      os.environ.get("QWEN_LOCAL_PATH", "").strip(),
-      "/home/s2457997/synchain-absa-emotion/models/Qwen2.5-7B-Instruct",
-      "/home/s2457997/synchain-absa-emotion/models/Qwen1.5-7B-Chat",
-   ]
-   candidate_paths = [path for path in candidate_paths if path]
+   torch.set_num_threads(max(1, torch.get_num_threads() // 2))
 
-   tokenizer = None
-   model = None
-   load_messages = []
-
-   for candidate_path in candidate_paths:
-      try:
-         if candidate_path and Path(candidate_path).is_dir():
-            try:
-               print(f"Trying local model at: {candidate_path}")
-               tokenizer = AutoTokenizer.from_pretrained(candidate_path, local_files_only=True, trust_remote_code=True)
-               model = AutoModelForCausalLM.from_pretrained(
-                  candidate_path,
-                  local_files_only=True,
-                  trust_remote_code=True,
-                  torch_dtype="auto",
-                  device_map="auto",
-               )
-               print(f"Loaded local model from {candidate_path}")
-               break
-            except Exception as error:
-               load_messages.append(f"Local load failed at {candidate_path}: {error}")
-      except PermissionError as perr:
-         load_messages.append(f"Permission denied checking {candidate_path}: {perr}")
-
-   offline_mode = bool(os.environ.get("HF_HUB_OFFLINE", "").strip() or os.environ.get("TRANSFORMERS_OFFLINE", "").strip())
-   default_model_id = "Qwen/Qwen2.5-7B-Instruct"
-
-   if model is None and not offline_mode:
-      try:
-         print(f"Falling back to remote model: {default_model_id}")
-         tokenizer = AutoTokenizer.from_pretrained(default_model_id, trust_remote_code=True)
-         model = AutoModelForCausalLM.from_pretrained(
-            default_model_id,
-            trust_remote_code=True,
-            torch_dtype="auto",
-            device_map="auto",
-         )
-         print(f"Loaded remote model: {default_model_id}")
-      except Exception as error:
-         print("Could not load model from Hugging Face; will use heuristic fallback.")
-         for message in load_messages:
-            print(message)
-         print(f"Remote load error: {error}")
-         print("Tip: set QWEN_LOCAL_PATH to a local model directory (e.g., models/Qwen2.5-7B-Instruct) to use LLM.")
-         model = None
-         tokenizer = None
-   elif model is None and offline_mode:
-      print("HF offline mode is set and no local model path found; using heuristic fallback.")
-
-   try:
-      torch.set_num_threads(max(1, torch.get_num_threads() // 2))
-   except Exception:
-      pass
-
-   mode_description = "LLM" if model is not None else "heuristic"
-   return model, tokenizer, mode_description
+   return model, tokenizer
 
 def build_dataset_configurations():
    dataset_specs = [
@@ -204,12 +148,13 @@ def build_dataset_configurations():
 
    configurations = []
    for spec in dataset_specs:
-      input_path = INPUT_DATA_DIR / spec["relative_input"]
       dataset_root = spec["relative_input"].parts[0]
+      dataset_dir = DATA_DIR / dataset_root
+      
+      input_path = DATA_DIR / spec["relative_input"]
+      processed_dir = dataset_dir / "processed"
       sanitized_stem = _sanitize_name(spec["relative_input"].stem)
-
-      processed_path = INPUT_DATA_DIR / dataset_root / "processed" / f"{sanitized_stem}_proc.csv"
-      processed_dir = INPUT_DATA_DIR / dataset_root / "processed"
+      processed_path = processed_dir / f"{sanitized_stem}_proc.csv"
 
       configurations.append(
          {
@@ -222,18 +167,16 @@ def build_dataset_configurations():
          }
       )
 
-   return configurations
-# Dataset-specific processing rules are implemented in main();
-# outputs are exactly the two partitioned CSVs per dataset (news / not news).
 
-def llm_tweet_annotation(model, tokenizer, input_file, output_file, tweet_column, save_frequency=25, mode_description="heuristic"):
+   return configurations
+
+def llm_tweet_annotation(model, tokenizer, input_file, output_file, tweet_column, save_frequency=25):
    print(f"Annotating {input_file} → {output_file}")
    dataframe = pd.read_csv(input_file, encoding="latin1")
 
    if tweet_column not in dataframe.columns:
       raise ValueError(f"Column '{tweet_column}' not found in {input_file}")
 
-   # Attempt to resume from previous annotation results if available.
    existing_annotations = None
    if Path(output_file).exists():
       try:
@@ -248,11 +191,11 @@ def llm_tweet_annotation(model, tokenizer, input_file, output_file, tweet_column
          overlap_count = min(len(existing_annotations), len(dataframe))
          dataframe.loc[:overlap_count - 1, "news_category"] = existing_annotations.loc[:overlap_count - 1, "news_category"]
 
-   examples = _get_5_shot_examples() if model is not None else None
+   examples = _get_5_shot_examples()
    tweets = dataframe[tweet_column].tolist()
 
    Path(output_file).parent.mkdir(parents=True, exist_ok=True)
-   print(f"Classifying tweets with incremental saving (mode={mode_description})...")
+   print(f"Classifying tweets with incremental saving...")
 
    try:
       for index, tweet_text in enumerate(tqdm(tweets, desc="News classification")):
@@ -260,11 +203,10 @@ def llm_tweet_annotation(model, tokenizer, input_file, output_file, tweet_column
          if already_labeled:
             continue
 
-         if model is not None:
-            label = _classify_tweet(model, tokenizer, tweet_text, examples)
+         if is_tweet_cut_off(tweet_text):
+            label = "news"
          else:
-            label = _heuristic_classify(tweet_text)
-
+            label = _classify_tweet(model, tokenizer, tweet_text, examples)
          dataframe.at[index, "news_category"] = label
 
          preview_text = str(tweet_text).replace("\n", " ").strip()
@@ -293,13 +235,11 @@ def main():
       if name == "senwave":
          if "Tweet" not in df.columns:
             raise ValueError("SenWave: 'Tweet' column missing")
-         # Filter out specified categories (drop rows where any equals 1)
          for col in ["Denial", "Official report", "Joking"]:
             if col not in df.columns:
                raise ValueError(f"SenWave: expected column '{col}' not found")
          mask_drop = (df["Denial"] == 1) | (df["Official report"] == 1) | (df["Joking"] == 1)
          df = df.loc[~mask_drop].copy()
-         # Standardize tweet column name
          df.rename(columns={"Tweet": "tweet"}, inplace=True)
          df["tweet"] = df["tweet"].apply(fix_and_remove_emojis)
          return df
@@ -311,6 +251,7 @@ def main():
          out = df[["tweet", "label"]].copy()
          out.rename(columns={"label": "original_sentiment"}, inplace=True)
          out["tweet"] = out["tweet"].apply(fix_and_remove_emojis)
+         out["original_sentiment"] = out["original_sentiment"].apply(standardize_sentiment)
          return out
       elif name in ("covid_19_nlp_test", "covid_19_nlp_train"):
          needed = ["OriginalTweet", "Sentiment"]
@@ -320,19 +261,18 @@ def main():
          out = df[["OriginalTweet", "Sentiment"]].copy()
          out.rename(columns={"OriginalTweet": "tweet", "Sentiment": "original_sentiment"}, inplace=True)
          out["tweet"] = out["tweet"].apply(fix_and_remove_emojis)
+         out["original_sentiment"] = out["original_sentiment"].apply(standardize_sentiment)
          return out
       else:
          raise ValueError(f"Unknown dataset name: {cfg['name']}")
 
-   # 1) Transform and write a canonical processed CSV per dataset
-   for cfg in datasets:
+   for cfg in tqdm(datasets, desc="Processing datasets"):
       cfg["processed_dir"].mkdir(parents=True, exist_ok=True)
       df_proc = load_and_transform_dataset(cfg)
       df_proc.to_csv(cfg["processed_path"], index=False)
 
-   # 2) Annotate using LLM/heuristic; 3) Partition into news / not-news
-   model, tokenizer, mode_description = load_news_classifier()
-   for cfg in datasets:
+   model, tokenizer = load_news_classifier()
+   for cfg in tqdm(datasets, desc="Annotating datasets"):
       tmp_annot = cfg["processed_dir"] / f"{cfg['sanitized_stem']}_categorised_tmp.csv"
       llm_tweet_annotation(
          model=model,
@@ -340,21 +280,17 @@ def main():
          input_file=cfg["processed_path"],
          output_file=tmp_annot,
          tweet_column="tweet",
-         mode_description=mode_description,
       )
 
       annotated = pd.read_csv(tmp_annot, encoding="latin1")
-      if "news_category" not in annotated.columns:
-         raise ValueError(f"Annotation failed for {cfg['name']}: 'news_category' missing")
+      if "news_category" not in annotated.columns: raise ValueError(f"Annotation failed for {cfg['name']}: 'news_category' missing")
 
       news_df = annotated[annotated["news_category"].str.lower() == "news"].copy()
       not_news_df = annotated[annotated["news_category"].str.lower() != "news"].copy()
 
-      # Strip URLs from non-news tweets
       if "tweet" in not_news_df.columns:
          not_news_df["tweet"] = not_news_df["tweet"].apply(strip_urls)
 
-      # Drop helper column before saving final partitions
       for d in (news_df, not_news_df):
          if "news_category" in d.columns:
             d.drop(columns=["news_category"], inplace=True)
@@ -362,10 +298,8 @@ def main():
       final_news = cfg["processed_dir"] / f"{cfg['sanitized_stem']}_news_proc.csv"
       final_not_news = cfg["processed_dir"] / f"{cfg['sanitized_stem']}_not_news_proc.csv"
 
-      # 4) Write final outputs then clean up only files for this dataset
       news_df.to_csv(final_news, index=False)
       not_news_df.to_csv(final_not_news, index=False)
-      # Remove tmp and prior intermediates for this dataset only
       try:
          if tmp_annot.exists():
             tmp_annot.unlink()
