@@ -53,7 +53,7 @@ CONLL_EXPLANATION = (
 
 EMOTION_LABELS = [
     "optimistic",
-    "thankful", 
+    "thankful",
     "empathetic",
     "pessimistic",
     "anxious",
@@ -66,7 +66,9 @@ EMOTION_LABELS = [
     "scared",
     "angry",
     "no_emotion",
+    "neutral"
 ]
+
 
 def get_emotion_labels_str():
     return ", ".join(EMOTION_LABELS[:-1]) + f", or {EMOTION_LABELS[-1]}"

@@ -1,11 +1,11 @@
-import os
+import gc
+import json
+from pathlib import Path
 
 import torch
 from tqdm import tqdm
 from transformers import AutoTokenizer, BitsAndBytesConfig
 from transformers.models.qwen2.modeling_qwen2 import Qwen2ForCausalLM
-from pathlib import Path
-import json
 
 LOCAL_MODEL_CACHE_DIR = (
     "/home/s3758869/synchain-absa-emotion/models/Qwen2.5-72B-Instruct"
@@ -34,25 +34,31 @@ def load_model(
         )
 
     tokenizer = AutoTokenizer.from_pretrained(
-        cache_dir,
+        str(Path(cache_dir)) if Path(cache_dir).exists() else model_name,
         trust_remote_code=True,
         local_files_only=True,
         fix_mistral_regex=True,
-        padding_side='left',
+        padding_side="left",
     )
-    
+
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
     model = Qwen2ForCausalLM.from_pretrained(
-        cache_dir,
+        model_identifier,
         quantization_config=bnb_config,
         device_map=device_map,
         trust_remote_code=True,
         local_files_only=True,
         low_cpu_mem_usage=True,
     )
-
+    
+    try:
+        model.gradient_checkpointing_enable()
+        print("Enabled checkpointing")
+    except:
+        pass
+    
     print(f"Model loaded successfully!")
     print(f"Device map: {model.hf_device_map}")
 
@@ -95,20 +101,20 @@ def generate_batch(model, tokenizer, prompts, max_new_tokens, batch_size=2):
         ]
     else:
         texts = prompts
-    
+
     all_decoded = []
-    
+
     with tqdm(total=len(texts), desc="Generating", unit="batch") as pbar:
         for i in range(0, len(texts), batch_size):
-            batch_texts = texts[i:i+batch_size]
+            batch_texts = texts[i : i + batch_size]
             inputs = tokenizer(
-                batch_texts, 
-                padding=True, 
+                batch_texts,
+                padding=True,
                 truncation=True,
                 max_length=2048,
-                return_tensors="pt"
+                return_tensors="pt",
             ).to(model.device)
-            
+
             with torch.no_grad():
                 outputs = model.generate(
                     **inputs,
@@ -117,19 +123,21 @@ def generate_batch(model, tokenizer, prompts, max_new_tokens, batch_size=2):
                     pad_token_id=tokenizer.pad_token_id,
                     use_cache=True,
                 )
-            
-            # More efficient: slice directly instead of list comprehension
+
             input_len = inputs.input_ids.shape[1]
             generated_ids = outputs[:, input_len:]
-            
+
             decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
             all_decoded.extend(decoded)
-            
+
             del inputs, outputs, generated_ids
-            torch.cuda.empty_cache()
-            
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+            gc.collect()
+
             pbar.update(len(batch_texts))
-    
+
     return all_decoded
 
 
@@ -140,7 +148,7 @@ def generate_batch_with_checkpoint(
     max_new_tokens,
     batch_size,
     checkpoint_file,
-    checkpoint_interval=20,
+    checkpoint_interval=10,
 ):
     checkpoint_path = Path(checkpoint_file)
 
@@ -162,7 +170,9 @@ def generate_batch_with_checkpoint(
         with open(checkpoint_path, "r", encoding="utf-8") as f:
             saved_outputs = json.load(f)
         if len(saved_outputs) > total:
-            raise ValueError(f"Checkpoint has more outputs ({len(saved_outputs)}) than prompts ({total}).")
+            raise ValueError(
+                f"Checkpoint has more outputs ({len(saved_outputs)}) than prompts ({total})."
+            )
         start_idx = len(saved_outputs)
         all_decoded = saved_outputs
         print(f"[{checkpoint_path.name}] Resuming from {start_idx}/{total}")
@@ -176,7 +186,11 @@ def generate_batch_with_checkpoint(
         return all_decoded
 
     batch_counter = 0
-    with tqdm(total=total - start_idx,desc=f"Generating ({checkpoint_path.name})",unit=f"batch") as pbar:
+    with tqdm(
+        total=total - start_idx,
+        desc=f"Generating ({checkpoint_path.name})",
+        unit=f"batch",
+    ) as pbar:
         for i in range(start_idx, total, batch_size):
             batch_texts = texts[i : i + batch_size]
 
@@ -184,7 +198,7 @@ def generate_batch_with_checkpoint(
                 batch_texts,
                 padding=True,
                 truncation=True,
-                max_length=2048,
+                max_length=1024,
                 return_tensors="pt",
             ).to(model.device)
 
@@ -213,7 +227,12 @@ def generate_batch_with_checkpoint(
                     json.dump(all_decoded, f, indent=2, ensure_ascii=False)
 
             del inputs, outputs, generated_ids
-            torch.cuda.empty_cache()
+            
+            # More aggressive memory cleanup
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+            gc.collect()
 
             pbar.update(len(batch_texts))
 

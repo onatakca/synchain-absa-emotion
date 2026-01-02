@@ -148,9 +148,7 @@ def extract_aspects(text):
 
     if not aspects:
         print("Issue with aspect parse from the LLM output.")
-        print(text)
-        parts = re.split(r"[,;\n]", text)
-        aspects = [p.strip().lower() for p in parts if len(p.strip()) > 0]
+        return []
 
     return aspects
 
@@ -164,13 +162,13 @@ def extract_sentiment(text):
     text = text.strip()
     if not text:
         return "neutral"
-    
+
     match = re.search(r"Sentiment:\s*(\w+)", text, re.IGNORECASE)
     if match:
         sentiment = match.group(1).strip().lower()
         if sentiment in ["positive", "negative", "neutral"]:
             return sentiment
-    
+
     text_lower = text.lower()
     if "positive" in text_lower:
         return "positive"
@@ -178,9 +176,8 @@ def extract_sentiment(text):
         return "negative"
     elif "neutral" in text_lower:
         return "neutral"
-    
+
     print("Issue with sentiment parse from the LLM output.")
-    print(text)
     return "neutral"
 
 
@@ -193,24 +190,34 @@ def extract_emotion(text):
     text = text.strip()
     if not text:
         return "no_emotion"
-    
+
     valid_emotions = [
-        "optimistic", "thankful", "empathetic", "pessimistic",
-        "anxious", "sad", "annoyed", "hopeful", "proud",
-        "trustful", "satisfied", "scared", "angry", "no_emotion"
+        "optimistic",
+        "thankful",
+        "empathetic",
+        "pessimistic",
+        "anxious",
+        "sad",
+        "annoyed",
+        "hopeful",
+        "proud",
+        "trustful",
+        "satisfied",
+        "scared",
+        "angry",
+        "no_emotion",
     ]
-    
+
     match = re.search(r"Emotion:\s*(\w+)", text, re.IGNORECASE)
     if match:
         emotion = match.group(1).strip().lower()
         if emotion in valid_emotions:
             return emotion
-    
+
     text_lower = text.lower()
     for emotion in valid_emotions:
         if emotion in text_lower:
             return emotion
-    
+
     print("Issue with emotion parse from the LLM output.")
-    print(text)
     return "no_emotion"

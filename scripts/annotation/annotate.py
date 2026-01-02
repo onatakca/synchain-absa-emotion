@@ -1,22 +1,31 @@
+import gc
 import json
 import os
 from pathlib import Path
 
 import pandas as pd
+import torch
 
-from scripts.annotation.parsing import extract_aspects, extract_sentiment, extract_emotion
-from scripts.qwen_model.prompts import (prompt_aspect_extraction,
-                                        prompt_emotion_classification,
-                                        prompt_opinion_extraction,
-                                        prompt_sentiment_classification,
-                                        prompt_syntactic_parsing)
-
-from scripts.qwen_model.qwen_model import load_model, generate_batch_with_checkpoint
+from scripts.annotation.parsing import (
+    extract_aspects,
+    extract_emotion,
+    extract_sentiment,
+)
+from scripts.qwen_model.prompts import (
+    prompt_aspect_extraction,
+    prompt_emotion_classification,
+    prompt_opinion_extraction,
+    prompt_sentiment_classification,
+    prompt_syntactic_parsing,
+)
+from scripts.qwen_model.qwen_model import generate_batch_with_checkpoint, load_model
 
 # thsi is valid for my dir layout, change this for your actual paths
-INPUT_PATH = "/home/s3758869/synchain-absa-emotion/data/input_data/chunks_for_teacher_model_ann"
-OUTPUT_PATH = "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-72b-instruct_annotation"
-MODEL_DIR = "/home/s3758869/synchain-absa-emotion/models/Qwen2.5-72B-Instruct"
+INPUT_PATH = (
+    "/home/s3758869/synchain-absa-emotion/data/input_data/chunks_for_teacher_model_ann"
+)
+OUTPUT_PATH = "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation"
+MODEL_DIR = "/home/s3758869/synchain-absa-emotion/models/Qwen2.5-32B-Instruct"
 
 CHECKPOINT_DIR = f"{OUTPUT_PATH}/checkpoints"
 
@@ -26,21 +35,30 @@ FILES_TO_ANNOTATE = [
     f"{INPUT_PATH}/covidsenti_chunk1.csv",
     f"{INPUT_PATH}/covidsenti_chunk2.csv",
     f"{INPUT_PATH}/covidsenti_chunk3.csv",
-    f"{INPUT_PATH}/covidsenti_chunk4.csv"
+    f"{INPUT_PATH}/covidsenti_chunk4.csv",
+    f"{INPUT_PATH}/covidsenti_chunk5.csv",
+    f"{INPUT_PATH}/covidsenti_chunk6.csv",
+    f"{INPUT_PATH}/covidsenti_chunk7.csv",
+    f"{INPUT_PATH}/covidsenti_chunk8.csv",
+    f"{INPUT_PATH}/covidsenti_chunk9.csv",
+    f"{INPUT_PATH}/covidsenti_chunk10.csv",
+    f"{INPUT_PATH}/covidsenti_chunk11.csv",
 ]
 
-MODEL_NAME = "Qwen/Qwen2.5-72B-Instruct"
+MODEL_NAME = "Qwen/Qwen2.5-32B-Instruct"
 QUANTS = 4
-BATCH_SIZE = 4
+BATCH_SIZE = 8
 
 Path(OUTPUT_PATH).mkdir(parents=True, exist_ok=True)
 Path(CHECKPOINT_DIR).mkdir(parents=True, exist_ok=True)
+
 
 def save_checkpoint(data, stage, filename):
     checkpoint_path = Path(CHECKPOINT_DIR) / filename
     with open(checkpoint_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
     print(f"Checkpoint saved: {stage} -> {checkpoint_path}")
+
 
 model, tokenizer = load_model(
     MODEL_NAME, QUANTS, device_map="auto", cache_dir=MODEL_DIR
@@ -49,13 +67,13 @@ model, tokenizer = load_model(
 for INPUT_FILE in FILES_TO_ANNOTATE:
     input_file_name = Path(INPUT_FILE).stem
     OUTPUT_FILE = f"{OUTPUT_PATH}/{input_file_name}_annotated.json"
-    
+
     print(f"\nProcessing: {input_file_name}")
-    
+
     if Path(OUTPUT_FILE).exists():
         print(f"Output file already exists, skipping: {OUTPUT_FILE}")
         continue
-    
+
     df = pd.read_csv(INPUT_FILE)
 
     tweets = df["tweet"].tolist()
@@ -74,11 +92,14 @@ for INPUT_FILE in FILES_TO_ANNOTATE:
     )
 
     aspect_lists = [extract_aspects(x) for x in r1_outputs]
-
+    
     tasks = []
-    for i, (tweet, conllu, aspects) in enumerate(zip(tweets, conllus, aspect_lists)):
-        for a in aspects:
-            tasks.append((i, tweet, conllu, a))
+    for i, aspects in enumerate(aspect_lists):
+        if aspects: 
+            tweet = tweets[i]
+            conllu = conllus[i]
+            for a in aspects:
+                tasks.append((i, tweet, conllu, a))
 
     print(f"Total aspect instances: {len(tasks)}")
 
@@ -185,5 +206,8 @@ for INPUT_FILE in FILES_TO_ANNOTATE:
 
     print(f"\nSaved: {OUTPUT_FILE}")
     print(f"Annotated {len(tweets)} tweets with {len(tasks)} aspect instances\n")
+
+    torch.cuda.empty_cache()
+    gc.collect()
 
 print("All files processed successfully!")

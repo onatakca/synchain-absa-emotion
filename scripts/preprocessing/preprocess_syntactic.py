@@ -1,8 +1,8 @@
 import sys
+from pathlib import Path
 
 import pandas as pd
 import spacy
-from pathlib import Path
 from tqdm import tqdm
 
 
@@ -60,7 +60,7 @@ def preprocess_dataset(input_path, output_path, tweet_column, sample_size=None):
         df.at[idx, "conllu_parse"] = conllu
 
     df_parsed = df[df["conllu_parse"] != ""].copy()
-    
+
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     df_parsed.to_csv(output_path, index=False)
 

@@ -3,12 +3,14 @@ import re
 import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from scripts.qwen_model.prompts import (EMOTION_LABELS,
-                                        prompt_aspect_extraction,
-                                        prompt_emotion_classification,
-                                        prompt_opinion_extraction,
-                                        prompt_sentiment_classification,
-                                        prompt_syntactic_parsing)
+from scripts.qwen_model.prompts import (
+    EMOTION_LABELS,
+    prompt_aspect_extraction,
+    prompt_emotion_classification,
+    prompt_opinion_extraction,
+    prompt_sentiment_classification,
+    prompt_syntactic_parsing,
+)
 from scripts.qwen_model.qwen_model import generate_response
 
 
