@@ -163,12 +163,19 @@ def extract_sentiment(text):
     if not text:
         return "neutral"
 
-    match = re.search(r"Sentiment:\s*(\w+)", text, re.IGNORECASE)
+    match = re.search(r"The sentiment towards:\s*(\w+)", text, re.IGNORECASE)
     if match:
-        sentiment = match.group(1).strip().lower()
-        if sentiment in ["positive", "negative", "neutral"]:
-            return sentiment
-
+        sentiment_sent = text.split(".")
+        if "The sentiment towards" in sentiment_sent:
+            sentiment = sentiment_sent[-1]
+            if sentiment in ["positive", "negative", "neutral"]:
+                return sentiment
+            else:
+                if "positive" in sentiment_sent : return "positive"
+                if "negative" in sentiment_sent : return "negative"
+                if "neutral" in sentiment_sent : return "neutral"
+                
+    text = text.split(".")[0]
     text_lower = text.lower()
     if "positive" in text_lower:
         return "positive"
@@ -221,3 +228,16 @@ def extract_emotion(text):
 
     print("Issue with emotion parse from the LLM output.")
     return "no_emotion"
+
+def test():
+    sent="The sentiment towards coronavirus in the given sentence is neutral. Because while Janet Yellen acknowledges the risk posed by the coronavirus to the global economy, she also notes that previous epidemics had little influence on the economy, indicating a balanced and measured perspective rather than a strongly positive or negative stance."
+    print(extract_sentiment(sent))
+
+    sent="The sentiment towards global economy in the given sentence is neutral. Because while Janet Yellen mentions a 'risk' posed by the coronavirus to the global economy, she also indicates that previous epidemics had little influence on the economy, suggesting a balanced view without clear positive or negative sentiment."
+    print(extract_sentiment(sent))
+
+    sent="Sentiment: neutral. Because Janet Yellen's statement indicates that previous epidemics had little influence on the global economy, which neither expresses a positive nor a negative sentiment towards them, but rather a factual observation about their impact."
+    print(extract_sentiment(sent))
+
+if __name__ == "__main__":
+    test()

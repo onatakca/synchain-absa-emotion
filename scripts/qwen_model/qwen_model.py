@@ -7,13 +7,8 @@ from tqdm import tqdm
 from transformers import AutoTokenizer, BitsAndBytesConfig
 from transformers.models.qwen2.modeling_qwen2 import Qwen2ForCausalLM
 
-LOCAL_MODEL_CACHE_DIR = (
-    "/home/s3758869/synchain-absa-emotion/models/Qwen2.5-72B-Instruct"
-)
-
-
 def load_model(
-    model_name="Qwen/Qwen2.5-72B-Instruct",
+    model_name,
     quantization_bits=4,
     device_map="auto",
     cache_dir="./",
@@ -33,8 +28,10 @@ def load_model(
             load_in_8bit=True,
         )
 
+    model_identifier = str(Path(cache_dir)) if Path(cache_dir).exists() else model_name
+
     tokenizer = AutoTokenizer.from_pretrained(
-        str(Path(cache_dir)) if Path(cache_dir).exists() else model_name,
+        model_identifier,
         trust_remote_code=True,
         local_files_only=True,
         fix_mistral_regex=True,
@@ -52,13 +49,6 @@ def load_model(
         local_files_only=True,
         low_cpu_mem_usage=True,
     )
-    
-    try:
-        model.gradient_checkpointing_enable()
-        print("Enabled checkpointing")
-    except:
-        pass
-    
     print(f"Model loaded successfully!")
     print(f"Device map: {model.hf_device_map}")
 
@@ -111,7 +101,7 @@ def generate_batch(model, tokenizer, prompts, max_new_tokens, batch_size=2):
                 batch_texts,
                 padding=True,
                 truncation=True,
-                max_length=2048,
+                max_length=1024,
                 return_tensors="pt",
             ).to(model.device)
 
@@ -228,7 +218,6 @@ def generate_batch_with_checkpoint(
 
             del inputs, outputs, generated_ids
             
-            # More aggressive memory cleanup
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
                 torch.cuda.synchronize()

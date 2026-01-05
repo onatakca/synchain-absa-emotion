@@ -47,7 +47,7 @@ FILES_TO_ANNOTATE = [
 
 MODEL_NAME = "Qwen/Qwen2.5-32B-Instruct"
 QUANTS = 4
-BATCH_SIZE = 8
+BATCH_SIZE = 24
 
 Path(OUTPUT_PATH).mkdir(parents=True, exist_ok=True)
 Path(CHECKPOINT_DIR).mkdir(parents=True, exist_ok=True)
