@@ -1,6 +1,5 @@
 import gc
 import json
-import os
 from pathlib import Path
 
 import pandas as pd
@@ -11,6 +10,7 @@ from scripts.annotation.parsing import (
     extract_emotion,
     extract_sentiment,
 )
+
 from scripts.qwen_model.prompts import (
     prompt_aspect_extraction,
     prompt_emotion_classification,
@@ -18,6 +18,7 @@ from scripts.qwen_model.prompts import (
     prompt_sentiment_classification,
     prompt_syntactic_parsing,
 )
+
 from scripts.qwen_model.qwen_model import generate_batch_with_checkpoint, load_model
 
 # thsi is valid for my dir layout, change this for your actual paths
