@@ -212,7 +212,7 @@ def extract_emotion(text):
         "satisfied",
         "scared",
         "angry",
-        "no_emotion",
+        "neutral"
     ]
 
     match = re.search(r"Emotion:\s*(\w+)", text, re.IGNORECASE)

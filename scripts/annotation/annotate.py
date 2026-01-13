@@ -211,4 +211,3 @@ for INPUT_FILE in FILES_TO_ANNOTATE:
     torch.cuda.empty_cache()
     gc.collect()
 
-print("All files processed successfully!")
