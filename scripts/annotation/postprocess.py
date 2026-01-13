@@ -35,4 +35,4 @@ for file in files_to_check:
             tweet_data["aspect_emotions_label"][aspect_num] = emotion
 
    with open(file, "w") as f:
-      json.dump(data, f)
+      json.dump(data, f, indent=3)
