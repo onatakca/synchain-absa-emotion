@@ -93,6 +93,7 @@ for INPUT_FILE in FILES_TO_ANNOTATE:
     )
 
     aspect_lists = [extract_aspects(x) for x in r1_outputs]
+    aspect_reasonings = r1_outputs 
     
     tasks = []
     for i, aspects in enumerate(aspect_lists):
@@ -176,7 +177,9 @@ for INPUT_FILE in FILES_TO_ANNOTATE:
         aspect_emotions = {}
         aspect_emotions_raw = {}
         aspect_emotions_label = {}
-
+        
+        aspect_reasoning = aspect_reasonings[i]  # Get reasoning for this specific tweet
+        
         aspect_id = 0
         for idx, (task, syn, op, sent, emo) in enumerate(
             zip(tasks, r2_outputs, r3_outputs, r4_outputs, r5_outputs)
@@ -193,6 +196,7 @@ for INPUT_FILE in FILES_TO_ANNOTATE:
                 aspect_id += 1
 
         output_data[tweet] = {
+            "aspect_reasoning": aspect_reasoning,
             "aspects": aspects_dict,
             "aspect_sentiments_raw": aspect_sentiments_raw,
             "aspect_sentiments_label": aspect_sentiments_label,

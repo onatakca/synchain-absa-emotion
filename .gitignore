@@ -220,3 +220,4 @@ slurm_outputs
 logs
 data/output_data/Qwen25-32b-instruct_annotation/checkpoints
 data/output_data/Qwen25-72b-instruct_annotation
+checkpoints
