@@ -20,10 +20,11 @@ def get_data(json_ann_files):
 
 
 class ABSADataset(Dataset):
-   def __init__(self, data, tasks):
+   def __init__(self, data, tasks, max_len=512, max_samples=None):
       self.data = data
       self.examples = []
       self.tasks = tasks
+      self.max_samples = max_samples
 
       for tweet, rec in self.data.items():
          aspects_dict = rec["aspects"]
@@ -83,6 +84,9 @@ class ABSADataset(Dataset):
                      "prompt_text": prompts[0],
                      "target_text": aspect_emotions_raw[k],
                   })
+      if max_samples is not None:
+         self.examples = self.examples[:max_samples]
+         
    def __getitem__(self, idx):
       return self.examples[idx]
 
