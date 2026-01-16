@@ -92,4 +92,4 @@ class EvaluationCallback(TrainerCallback):
       if torch.cuda.is_available():torch.cuda.empty_cache()
       
       model.train()
-      return control
+      return metrics

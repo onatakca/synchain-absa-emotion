@@ -38,7 +38,7 @@ class ABSADataset(Dataset):
          aspect_emotions_raw = rec["aspect_emotions_raw"]           
 
          prompts = prompt_aspect_extraction_no_res([tweet], [conllu_parse]) 
-         target_text = " ".join(aspect_terms)  
+         target_text = "\n".join([f"ASPECT: {a}" for a in aspect_terms])
          self.examples.append({
                "task": "aspect_extraction",
                "prompt_text": prompts[0],

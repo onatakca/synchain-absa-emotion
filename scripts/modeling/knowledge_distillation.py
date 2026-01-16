@@ -10,7 +10,7 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
 TRAIN_FILES = [
     "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk1_annotated.json",
-    # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk2_annotated.json",
+    "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk2_annotated.json",
     # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk3_annotated.json",
     # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk4_annotated.json",
     # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk5_annotated.json",
@@ -27,7 +27,7 @@ VALIDATION_FILES = [
     "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk0_annotated.json",
 ]
 
-config_file_path = "/home/s3758869/synchain-absa-emotion/scripts/modeling/configs/full_pipeline.json"
+config_file_path = "/home/s3758869/synchain-absa-emotion/scripts/modeling/configs/qwen7b/full_pipeline_qwen7b_all_steps.json"
 
 with open(config_file_path, "r") as f:
     config = json.load(f)
@@ -94,7 +94,6 @@ training_args = TrainingArguments(
     logging_dir = logs_dir,
     per_device_train_batch_size=config["train_batch_size"],
     per_device_eval_batch_size=config["val_batch_size"],
-    num_train_epochs=config["num_train_epochs"],
     learning_rate=config["learning_rate"],
     remove_unused_columns=False,
     logging_strategy="steps",
@@ -111,6 +110,7 @@ training_args = TrainingArguments(
     save_strategy="steps",
     save_steps=config["save_steps"],
     save_total_limit=config["save_total_limit"],
+    max_steps=config["max_steps"],
     seed=config["seed"],
 )
 
@@ -120,18 +120,24 @@ trainer = Trainer(
     train_dataset=train_dataset,
     eval_dataset=val_dataset,    
     data_collator=collator, 
-    callbacks=[EvaluationCallback(val_dataset, student_tokenizer, config["max_new_tokens"], config["tasks"])] 
 )
 
-eval_metrics = trainer.evaluate()
-with open(eval_dir / "eval_before_train.json", "w") as f:
-    json.dump(eval_metrics, f, indent=2, sort_keys=True)
-    
+print("Training")
 trainer.train()
 
+trainer.save_state()
+trainer.save_model(str(run_dir / "final_model"))
+student_tokenizer.save_pretrained(str(run_dir / "final_model"))
+
+print("Getting train loss")
 final_metrics = trainer.evaluate()
 with open(eval_dir / "eval_after_train.json", "w") as f:
     json.dump(final_metrics, f, indent=2, sort_keys=True)
-    
-trainer.save_model(str(run_dir / "final_model"))
-student_tokenizer.save_pretrained(str(run_dir / "final_model"))
+    f.flush()
+
+print("Evaluation callback :")
+eval_callback = EvaluationCallback(val_dataset, student_tokenizer, config["max_new_tokens"], config["tasks"])
+gen_metrics = eval_callback.on_evaluate(training_args, trainer.state, trainer.control, model=student_model)
+with open(eval_dir / "gen_eval_after_train.json", "w") as f:
+    json.dump(gen_metrics, f, indent=2, sort_keys=True)
+    f.flush()
