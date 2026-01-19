@@ -39,40 +39,57 @@ class EvaluationCallback(TrainerCallback):
       aspects_tp = 0.0
       aspects_fp = 0.0
       aspects_fn = 0.0
-      
+
+      aspect_preds = []  
+      aspect_gts = []   
+
       if aspect_items:
          prompts = [item["prompt_text"] for item in aspect_items]
          outputs = generate_batch(model, self.tokenizer, prompts, self.max_new_tokens, batch_size=self.eval_batch_size)
          for item, model_output in zip(aspect_items, outputs):
-            teacher_aspects = item["target_text"].split()
+            teacher_aspects = [line.replace("ASPECT: ", "").strip() for line in item["target_text"].splitlines() if line.strip().startswith("ASPECT:")]
             student_aspects = extract_aspects(model_output)
             S, T = set(student_aspects), set(teacher_aspects)
             aspects_tp += len(S & T)
             aspects_fp += len(S - T)
             aspects_fn += len(T - S)
-      
+            aspect_preds.append(student_aspects)
+            aspect_gts.append(teacher_aspects)
+
       teacher_sentiments, student_sentiments = [], []
+      sentiment_preds = []
+      sentiment_gts = []
       if sentiment_items:
          prompts = [item["prompt_text"] for item in sentiment_items]
          outputs = generate_batch(model, self.tokenizer, prompts, self.max_new_tokens, batch_size=self.eval_batch_size)
          for item, model_output in zip(sentiment_items, outputs):
-            teacher_sentiments.append(extract_sentiment(item["target_text"]))
-            student_sentiments.append(extract_sentiment(model_output))
-      
+            gt = extract_sentiment(item["target_text"])
+            pred = extract_sentiment(model_output)
+            teacher_sentiments.append(gt)
+            student_sentiments.append(pred)
+            sentiment_gts.append(gt)
+            sentiment_preds.append(pred)
+
       teacher_emotions, student_emotions = [], []
+      emotion_preds = []
+      emotion_gts = []
       if emotion_items:
          prompts = [item["prompt_text"] for item in emotion_items]
          outputs = generate_batch(model, self.tokenizer, prompts, self.max_new_tokens, batch_size=self.eval_batch_size)
          for item, model_output in zip(emotion_items, outputs):
-            teacher_emotions.append(extract_emotion(item["target_text"]))
-            student_emotions.append(extract_emotion(model_output))
+            gt = extract_emotion(item["target_text"])
+            pred = extract_emotion(model_output)
+            teacher_emotions.append(gt)
+            student_emotions.append(pred)
+            emotion_gts.append(gt)
+            emotion_preds.append(pred)
 
       aspect_recall = aspects_tp / (aspects_tp + aspects_fn) if (aspects_tp + aspects_fn) > 0 else 0.0
       aspect_precision = aspects_tp / (aspects_tp + aspects_fp) if (aspects_tp + aspects_fp) > 0 else 0.0
       aspect_f1 = 2 * aspect_recall * aspect_precision / (1e-07 + aspect_precision + aspect_recall)
       sentiment_accuracy = accuracy(teacher_sentiments, student_sentiments) if teacher_sentiments else 0.0
       emotion_accuracy = accuracy(teacher_emotions, student_emotions) if teacher_emotions else 0.0
-      
+
       metrics = {
          "gen_eval/aspect_precision": aspect_precision,
          "gen_eval/aspect_recall": aspect_recall,
@@ -80,16 +97,25 @@ class EvaluationCallback(TrainerCallback):
          "gen_eval/sentiment_acc": sentiment_accuracy,
          "gen_eval/emotion_acc": emotion_accuracy,
       }
-      
+
       print(f"Results::")
       for k, v in metrics.items():
          print(f"{k}: {v:.4f}")
-      
+
       if kwargs.get("trainer", None) is not None:
          trainer = kwargs.get("trainer", None)
          trainer.log(metrics)
 
-      if torch.cuda.is_available():torch.cuda.empty_cache()
-      
+      if torch.cuda.is_available():
+         torch.cuda.empty_cache()
+
       model.train()
-      return metrics
+      return {
+         "metrics": metrics,
+         "aspect_preds": aspect_preds,
+         "aspect_gts": aspect_gts,
+         "sentiment_preds": sentiment_preds,
+         "sentiment_gts": sentiment_gts,
+         "emotion_preds": emotion_preds,
+         "emotion_gts": emotion_gts,
+      }

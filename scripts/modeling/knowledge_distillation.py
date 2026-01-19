@@ -6,17 +6,16 @@ from datetime import datetime
 from pathlib import Path
 import os
 import torch
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training, PeftModel
 
 TRAIN_FILES = [
     "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk1_annotated.json",
     "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk2_annotated.json",
-    # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk3_annotated.json",
-    # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk4_annotated.json",
-    # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk5_annotated.json",
+    "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk3_annotated.json",
+    "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk4_annotated.json",
+    "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk5_annotated.json",
     # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk6_annotated.json",
     # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk7_annotated.json",
-    # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk8_annotated.json",
     # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk9_annotated.json",
     # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk10_annotated.json",
     # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk11_annotated.json",
@@ -25,20 +24,29 @@ TRAIN_FILES = [
 
 VALIDATION_FILES = [
     "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk0_annotated.json",
+    "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk8_annotated.json"
 ]
 
-config_file_path = "/home/s3758869/synchain-absa-emotion/scripts/modeling/configs/qwen7b/full_pipeline_qwen7b_all_steps.json"
+config_file_path = "/home/s3758869/synchain-absa-emotion/scripts/modeling/configs/qwen7b/evaluation_qwen7b.json"
 
+print(f"Configuration file : {config_file_path}")
 with open(config_file_path, "r") as f:
     config = json.load(f)
     
+evaluation_tasks = [
+    "aspect_extraction", 
+    "aspect_sentiment_analysis", 
+    "aspect_emotion_detection"
+]
+
 train_dataset = ABSADataset(get_data(TRAIN_FILES), tasks = config["tasks"], max_samples = config["max_samples"])
-val_dataset = ABSADataset(get_data(VALIDATION_FILES), tasks=  config["tasks"], max_samples= config["max_samples"])
+val_dataset = ABSADataset(get_data(VALIDATION_FILES), tasks=  config.get("evaluation_tasks", evaluation_tasks), max_samples= config["max_samples"])
 
 
 run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 model_name = config["model_identifier"].split("/")[-1]
-base_out = Path(config["out_path"]) / model_name
+run_name = config_file_path.split("/")[-1].split(".json")[0]
+base_out = Path(config["out_path"]) / model_name / run_name
 
 run_dir = base_out / run_id
 ckpt_dir = run_dir / "checkpoints"
@@ -77,67 +85,100 @@ student_model = prepare_model_for_kbit_training(student_model)
 if config.get("gradient_checkpointing", False):
     student_model.gradient_checkpointing_enable()
 
+with open(run_dir / "train_files.txt", "w") as f:
+    for file in TRAIN_FILES:
+        f.write(f"{file}\n")
+with open(run_dir / "val_files.txt", "w") as f:
+    for file in VALIDATION_FILES:
+        f.write(f"{file}\n")
+
+eval_only = config.get("eval_only", False)
+trained_adapter_path = config.get("trained_adapter_path", None)
+
+if eval_only:
+    if trained_adapter_path:
+        student_model = PeftModel.from_pretrained(student_model, trained_adapter_path)
+else:
+    target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+    lora_config = LoraConfig(
+        r=config["lora_r"],
+        lora_alpha=config["lora_alpha"],
+        lora_dropout=config["lora_dropout"],
+        bias="none",
+        task_type="CAUSAL_LM",
+        target_modules=config.get("target_modules", target_modules),
+    )
+    student_model = get_peft_model(student_model, lora_config)
+    student_model.print_trainable_parameters()
+
+target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
 lora_config = LoraConfig(
     r=config["lora_r"],
     lora_alpha=config["lora_alpha"],
     lora_dropout=config["lora_dropout"],
     bias="none",
     task_type="CAUSAL_LM",
-    target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    target_modules=config.get("target_modules",target_modules),
 )
 
-student_model = get_peft_model(student_model, lora_config)
-student_model.print_trainable_parameters()
+if not config["eval_only"]:
+    student_model = get_peft_model(student_model, lora_config)
+    student_model.print_trainable_parameters()
 
-training_args = TrainingArguments(
-    output_dir=ckpt_dir,
-    logging_dir = logs_dir,
-    per_device_train_batch_size=config["train_batch_size"],
-    per_device_eval_batch_size=config["val_batch_size"],
-    learning_rate=config["learning_rate"],
-    remove_unused_columns=False,
-    logging_strategy="steps",
-    logging_steps=config["logging_steps"],
-    logging_first_step=True,
-    metric_for_best_model="eval_loss",
-    greater_is_better=False,
-    gradient_accumulation_steps=config["gradient_accumulation_steps"],
-    dataloader_num_workers=min(os.cpu_count(),config["dataloader_num_workers"]),
-    eval_strategy="no",
-    bf16=config.get("bf16", False),
-    optim="paged_adamw_8bit", 
-    gradient_checkpointing=config.get("gradient_checkpointing", False),
-    save_strategy="steps",
-    save_steps=config["save_steps"],
-    save_total_limit=config["save_total_limit"],
-    max_steps=config["max_steps"],
-    seed=config["seed"],
-)
+    training_args = TrainingArguments(
+        output_dir=ckpt_dir,
+        logging_dir = logs_dir,
+        per_device_train_batch_size=config["train_batch_size"],
+        per_device_eval_batch_size=config["val_batch_size"],
+        learning_rate=config["learning_rate"],
+        remove_unused_columns=False,
+        logging_strategy="steps",
+        logging_steps=config["logging_steps"],
+        logging_first_step=True,
+        metric_for_best_model="eval_loss",
+        greater_is_better=False,
+        gradient_accumulation_steps=config["gradient_accumulation_steps"],
+        dataloader_num_workers=min(os.cpu_count(),config["dataloader_num_workers"]),
+        eval_strategy="no",
+        bf16=config.get("bf16", False),
+        optim="paged_adamw_8bit", 
+        gradient_checkpointing=config.get("gradient_checkpointing", False),
+        save_strategy="steps",
+        save_steps=config["save_steps"],
+        save_total_limit=config["save_total_limit"],
+        max_steps=config["max_steps"],
+        seed=config["seed"],
+    )
 
-trainer = Trainer(
-    model=student_model,
-    args=training_args,
-    train_dataset=train_dataset,
-    eval_dataset=val_dataset,    
-    data_collator=collator, 
-)
+    trainer = Trainer(
+        model=student_model,
+        args=training_args,
+        train_dataset=train_dataset,
+        eval_dataset=val_dataset,    
+        data_collator=collator, 
+    )
 
-print("Training")
-trainer.train()
+    print("Training")
+    trainer.train()
 
-trainer.save_state()
-trainer.save_model(str(run_dir / "final_model"))
-student_tokenizer.save_pretrained(str(run_dir / "final_model"))
+    trainer.save_state()
+    trainer.save_model(str(run_dir / "final_model"))
+    student_tokenizer.save_pretrained(str(run_dir / "final_model"))
 
-print("Getting train loss")
-final_metrics = trainer.evaluate()
-with open(eval_dir / "eval_after_train.json", "w") as f:
-    json.dump(final_metrics, f, indent=2, sort_keys=True)
-    f.flush()
+    print("Getting train loss")
+    final_metrics = trainer.evaluate()
+    with open(eval_dir / "eval_after_train.json", "w") as f:
+        json.dump(final_metrics, f, indent=2, sort_keys=True)
+        f.flush()
+
 
 print("Evaluation callback :")
-eval_callback = EvaluationCallback(val_dataset, student_tokenizer, config["max_new_tokens"], config["tasks"])
-gen_metrics = eval_callback.on_evaluate(training_args, trainer.state, trainer.control, model=student_model)
+eval_callback = EvaluationCallback(val_dataset, student_tokenizer, config["max_new_tokens"], config.get("evaluation_tasks", evaluation_tasks))
+if not config["eval_only"]:
+    gen_metrics = eval_callback.on_evaluate(training_args, trainer.state, trainer.control, model=student_model)
+else:
+    gen_metrics = eval_callback.on_evaluate(None, None, None, model=student_model)
+    
 with open(eval_dir / "gen_eval_after_train.json", "w") as f:
     json.dump(gen_metrics, f, indent=2, sort_keys=True)
     f.flush()

@@ -7,10 +7,17 @@
       "aspect_sentiment_analysis", 
       "aspect_emotion_detection"
    ],
-   "max_steps" : 500, 
+   "evaluation_tasks" : [
+      "aspect_extraction", 
+      "aspect_sentiment_analysis", 
+      "aspect_emotion_detection"
+   ],
+   "eval_only" :  false,
+   "max_steps" : 600, 
    "lora_r" : 16,
    "lora_alpha" : 32,
    "lora_dropout" : 0.05,
+   "target_modules" : ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
    "out_path" : "/home/s3758869/synchain-absa-emotion/checkpoints",
    "learning_rate" : 1e-05,
    "logging_steps" : 100,

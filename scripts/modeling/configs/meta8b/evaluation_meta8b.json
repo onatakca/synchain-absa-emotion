@@ -1,5 +1,6 @@
 {
-   "model_identifier" : "/home/s3758869/models/Qwen2.5-7B-Instruct",
+   "model_identifier" : "/home/s3758869/models/Meta-Llama-3-8B-Instruct",
+   "trained_adapter_path" : null,
    "tasks" : [
       "aspect_extraction", 
       "aspect_sentiment_analysis", 
@@ -10,8 +11,8 @@
       "aspect_sentiment_analysis", 
       "aspect_emotion_detection"
    ],
-   "eval_only" :  false,
-   "max_steps" : 400, 
+   "eval_only" :  true,
+   "max_steps" : 160, 
    "lora_r" : 16,
    "lora_alpha" : 32,
    "lora_dropout" : 0.05,
