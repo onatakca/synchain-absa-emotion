@@ -23,7 +23,7 @@
    "gradient_accumulation_steps" : 8,
    "max_new_tokens" : 256,
    "max_length" : 1024,
-   "train_batch_size" : 8,
+   "train_batch_size" : 4,
    "val_batch_size" : 8,
    "bf16" : true,
    "gradient_checkpointing" : true,

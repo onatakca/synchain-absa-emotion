@@ -1,6 +1,6 @@
 {
    "model_identifier" : "/home/s3758869/models/Meta-Llama-3-8B-Instruct",
-   "trained_adapter_path" : null,
+   "trained_adapter_path" : "/home/s3758869/synchain-absa-emotion/checkpoints/Meta-Llama-3-8B-Instruct/full_pipeline_meta8b_all_steps/2026-01-19_11-36-15/final_model",
    "tasks" : [
       "aspect_extraction", 
       "aspect_sentiment_analysis", 

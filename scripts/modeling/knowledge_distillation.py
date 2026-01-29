@@ -11,22 +11,22 @@ from scripts.modeling.evaluate import EvaluationCallback
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training, PeftModel
 
 TRAIN_FILES = [
-    "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk1_annotated.json",
-    "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk2_annotated.json",
-    "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk3_annotated.json",
-    "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk4_annotated.json",
-    "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk5_annotated.json",
-    # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk6_annotated.json",
-    # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk7_annotated.json",
-    # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk9_annotated.json",
-    # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk10_annotated.json",
-    # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk11_annotated.json",
-    # "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covid19nlp_chunk0_annotated.json"
+    "./synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk1_annotated.json",
+    "./synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk2_annotated.json",
+    "./synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk3_annotated.json",
+    "./synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk4_annotated.json",
+    "./synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk5_annotated.json",
+    # "./synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk6_annotated.json",
+    # "./synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk7_annotated.json",
+    # "./synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk9_annotated.json",
+    # "./synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk10_annotated.json",
+    # "./synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk11_annotated.json",
+    # "./synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covid19nlp_chunk0_annotated.json"
 ]
 
 VALIDATION_FILES = [
-    "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk0_annotated.json",
-    "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk8_annotated.json"
+    "./synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk0_annotated.json",
+    "./synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation/covidsenti_chunk8_annotated.json"
 ]
 
 def main():
@@ -57,6 +57,9 @@ def main():
     run_name = config_file_path.split("/")[-1].split(".json")[0]
     base_out = Path(config["out_path"]) / model_name / run_name
 
+    print(f"run_name : {run_name}")
+    print(f"base_out : {base_out}")
+    
     run_dir = base_out / run_id
     ckpt_dir = run_dir / "checkpoints"
     logs_dir = run_dir / "logs"
@@ -103,7 +106,9 @@ def main():
 
     eval_only = config.get("eval_only", False)
     trained_adapter_path = config.get("trained_adapter_path", None)
-
+    print(f"eval_only : {eval_only}")
+    print(f"trained_adapter_path : {trained_adapter_path}")
+    
     if eval_only:
         if trained_adapter_path:
             student_model = PeftModel.from_pretrained(student_model, trained_adapter_path)

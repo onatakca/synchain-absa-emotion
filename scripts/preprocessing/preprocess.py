@@ -211,7 +211,6 @@ def llm_tweet_annotation(
     tweets = dataframe[tweet_column].tolist()
 
     Path(output_file).parent.mkdir(parents=True, exist_ok=True)
-    print(f"Classifying tweets with incremental saving...")
 
     try:
         for index, tweet_text in enumerate(tqdm(tweets, desc="News classification")):

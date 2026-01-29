@@ -23,10 +23,10 @@ from scripts.qwen_model.qwen_model import generate_batch_with_checkpoint, load_m
 
 # thsi is valid for my dir layout, change this for your actual paths
 INPUT_PATH = (
-    "/home/s3758869/synchain-absa-emotion/data/input_data/chunks_for_teacher_model_ann"
+    ".synchain-absa-emotion/data/input_data/chunks_for_teacher_model_ann"
 )
-OUTPUT_PATH = "/home/s3758869/synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation"
-MODEL_DIR = "/home/s3758869/synchain-absa-emotion/models/Qwen2.5-32B-Instruct"
+OUTPUT_PATH = ".synchain-absa-emotion/data/output_data/Qwen25-32b-instruct_annotation"
+MODEL_DIR = "./Qwen2.5-32B-Instruct" # lcoal path to teacher model
 
 CHECKPOINT_DIR = f"{OUTPUT_PATH}/checkpoints"
 
@@ -71,9 +71,9 @@ for INPUT_FILE in FILES_TO_ANNOTATE:
 
     print(f"\nProcessing: {input_file_name}")
 
-    if Path(OUTPUT_FILE).exists():
-        print(f"Output file already exists, skipping: {OUTPUT_FILE}")
-        continue
+    # if Path(OUTPUT_FILE).exists():
+    #     print(f"Output file already exists, skipping: {OUTPUT_FILE}")
+    #     continue
 
     df = pd.read_csv(INPUT_FILE)
 
@@ -181,7 +181,7 @@ for INPUT_FILE in FILES_TO_ANNOTATE:
         aspect_reasoning = aspect_reasonings[i]  # Get reasoning for this specific tweet
         
         aspect_id = 0
-        for idx, (task, syn, op, sent, emo) in enumerate(
+        for idx, (task, asp, syn, op, sent, emo) in enumerate(
             zip(tasks, r2_outputs, r3_outputs, r4_outputs, r5_outputs)
         ):
             tweet_idx, _, _, aspect = task

@@ -178,7 +178,7 @@ dmypy.json
 # pytype static type analyzer
 .pytype/
 
-# Cython debug symbols
+# Cython debug symbolshttps://www.overleaf.com/project/691206d56263510149d11dcc#
 cython_debug/
 
 # PyCharm
@@ -221,3 +221,5 @@ logs
 data/output_data/Qwen25-32b-instruct_annotation/checkpoints
 data/output_data/Qwen25-72b-instruct_annotation
 checkpoints
+data/input_data/minsi_data
+slurm_scripts
