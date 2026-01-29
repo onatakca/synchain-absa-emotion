@@ -68,8 +68,8 @@ Prompts and emotion label definitions are in:
 
 ## Data
 
-- **Input Chunks for Teacher Annotation:**
+- **Input chunks for teacher annotation:**
 	- `data/input_data/chunks_for_teacher_model_ann/`
-- **Teacher Annotated Outputs (e.g., Qwen25-32b-Instruct):**
+- **Teacher annotated outputs (Qwen25-32b-Instruct):**
 	- `data/output_data/Qwen25-32b-instruct_annotation/`
 
