@@ -9,3 +9,9 @@ sentencepiece
 protobuf
 safetensors
 Pillow>=10.0.0
+emoji
+ftfy
+bitsandbytes 
+peft 
+accelerate
+openpyxl

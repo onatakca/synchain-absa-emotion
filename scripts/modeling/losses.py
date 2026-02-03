@@ -1,16 +1,13 @@
-import matplotlib.pyplot as plt
-import nlp
-import pandas as pd
-import seaborn as sns
-import spacy
-import tqdm
+import numpy as np
 
 
-def task_loss_reasoning(teacher_reasoning_traces, student_reasoning_traces):
-    loss = None
-    return loss
+def cross_entropy(targets,preds, epsilon=1e-07):
+    return - np.sum(targets * np.log(preds + epsilon))
+
+def kl_divergence(target_distribution, predicted_distribution):
+    ce = cross_entropy(target_distribution, predicted_distribution)
+    entropy = cross_entropy(target_distribution, target_distribution)
+    return ce - entropy
 
 
-def task_loss_label(teacher_labels, student_labels):
-    loss = None
-    return loss
+    
